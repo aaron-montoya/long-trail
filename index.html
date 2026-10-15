@@ -311,6 +311,8 @@ html.phone .acts .act span { font-size: 12px; }
 .seat { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) auto minmax(0, 170px) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
 .deckc { display: inline-flex; align-items: center; gap: 4px; }
 .deckc img { height: 24px; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
+.panel.resume { border-color: var(--accent); }
+.panel.resume p { margin: 4px 0 8px; }
 .seat .keptline { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .seat .keptline .ghost { padding: 1px 8px; font-size: 12px; }
 .carry { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -469,6 +471,7 @@ const LT = (() => {
   // ---------------- Game ----------------
   class Game {
     constructor(opts) {
+      uid = 0; // card ids depend only on the seed, so a saved race replays the same way
       this.io = opts.io || {};
       this.seed = opts.seed ?? Math.floor(Math.random() * 1e9);
       this.mode = opts.mode || "standard";
@@ -1576,18 +1579,24 @@ const humans = () => S.game ? S.game.players.filter(p => !p.bot) : [];
 function makeIO() {
   const io = {
     G: null,
+    rec: [],      // every answer a human gave, in order: replaying them rebuilds the race
+    replay: null, // answers still to feed back while resuming a saved race
     live() { return S.game && S.game === io.G; },
     log(line) {
       if (!io.live()) return;
       const g = S.game;
       if (g.current && line.cls !== "round") S.lastAct[g.current.idx] = line.msg;
-      renderLog();
+      if (!io.replay) renderLog();
     },
-    update() { if (io.live() && S.screen === "game") renderGame(); },
+    update() { if (io.live() && !io.replay && S.screen === "game") renderGame(); },
     ask(p, req) {
       if (!io.live()) return new Promise(() => {});
+      if (io.replay) {
+        if (io.replay.length) return Promise.resolve(io.replay.shift().v);
+        return io.goLive(p).then(() => io.ask(p, req));
+      }
       return new Promise(resolve => {
-        S.pending = { p, req, resolve };
+        S.pending = { p, req, resolve: v => { io.rec.push(v === undefined ? {} : { v }); saveRace(); resolve(v); } };
         if (req.type === "action") {
           // after using gear mid-setup, come back to the same line
           if (S.keepRun) { const k = S.keepRun; S.keepRun = null;
@@ -1597,8 +1606,18 @@ function makeIO() {
         renderGame();
       });
     },
+    // The saved answers have run out: the race is back where it was saved. Hand it to the right player.
+    async goLive(p) {
+      io.replay = null;
+      renderGame(true);
+      if (humans().length > 1) { S.viewer = null; await new Promise(res => { S.overlay = { type: "pass", p, res }; renderGame(); }); }
+      S.viewer = p;
+      T.turnBegin();
+      renderGame(true);
+    },
     async turnStart(p) {
       if (!io.live()) return new Promise(() => {});
+      if (io.replay) return;
       await T.waitRunning();
       if (p.bot) {
         T.turnBegin();
@@ -1615,13 +1634,26 @@ function makeIO() {
     },
     async afterTurn(p) {
       if (!io.live()) return new Promise(() => {});
+      if (io.replay) return;
       if (p.bot && S.botSpeed > 0) await sleep(S.botSpeed);
       T.turnEnd(p);
+      saveRace();
       await T.waitRunning();
     },
   };
   return io;
 }
+// ---------------- Save and resume ----------------
+// A race is saved as its setup plus every answer the humans gave. Resuming builds the same race from the
+// same seed and feeds those answers back instantly, so it lands exactly where it was left.
+function saveRace() {
+  const g = S.game, io = g && g.io;
+  if (!g || g.over || !io || !io.opts || io.replay || !g.players.some(p => !p.bot)) return;
+  store.set("save", { v: 1, build: LT_BUILD, opts: io.opts, rec: io.rec, timer: { elapsed: T.active(), per: T.per.slice(), turns: T.turns.slice() },
+    round: g.round, names: g.players.map(p => p.name), at: Date.now() });
+}
+function savedRace() { const sv = store.get("save", null); return sv && sv.v === 1 && sv.opts ? sv : null; }
+function clearSave() { store.set("save", null); }
 // ---------------- Race timer ----------------
 const T = {
   reset(n) { this.start = Date.now(); this.pausedTotal = 0; this.pausedAt = null; this.end = null; this.per = Array(n).fill(0); this.turns = Array(n).fill(0); this.ts = null; },
@@ -1649,20 +1681,33 @@ function resolvePending(v) {
   pd.resolve(v);
 }
 
-async function startGame(seed) {
-  const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
-  store.set("seats", S.seats);
+async function startGame(seed, resume) {
+  let opts;
+  if (resume) opts = resume.opts;
+  else {
+    const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
+    store.set("seats", S.seats);
+    opts = { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice() };
+  }
   const io = makeIO();
-  S.game = new LT.Game({ players: seats, io, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice() });
+  S.game = new LT.Game({ ...opts, io });
   io.G = S.game;
-  S.screen = "game"; S.pending = null; S.run = null; S.overlay = null; S.lastAct = {};
-  T.reset(seats.length);
-  const hs = humans();
-  S.viewer = hs.length === 1 ? hs[0] : null;
+  io.opts = { ...opts, seed: S.game.seed };
+  S.screen = "game"; S.pending = null; S.run = null; S.overlay = null; S.lastAct = {}; S.carry = null;
+  T.reset(opts.players.length);
+  if (resume) {
+    io.rec = resume.rec.slice(); io.replay = resume.rec.slice();
+    T.start = Date.now() - (resume.timer.elapsed || 0); T.per = resume.timer.per.slice(); T.turns = resume.timer.turns.slice();
+    S.viewer = null;
+  } else {
+    const hs = humans();
+    S.viewer = hs.length === 1 ? hs[0] : null;
+    saveRace();
+  }
   render();
   const g = S.game;
   try { await g.play(); } catch (e) { console.error(e); g.log("Something went wrong: " + e.message, "sys"); }
-  if (S.game === g) { T.stop(); tickClock(); setupCarry(g); S.overlay = { type: "over" }; renderGame(); }
+  if (S.game === g) { io.replay = null; clearSave(); T.stop(); tickClock(); setupCarry(g); S.overlay = { type: "over" }; renderGame(true); }
 }
 
 // ---------------- Carry-over ----------------
@@ -1734,10 +1779,16 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 1:21 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 1:33 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
+    ${(() => { const sv = savedRace(); if (!sv) return "";
+      const when = new Date(sv.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      return `<div class="panel resume"><div class="label">Race in progress</div>
+        <p>${sv.names.map(esc).join(", ")} · round ${sv.round} · ${fmt(sv.timer.elapsed || 0)} on the clock · saved ${esc(when)}</p>
+        ${sv.build !== LT_BUILD ? `<p class="small">Saved on an older version of the game. It should pick up where you left off, but if the rules changed since, the race may play out differently.</p>` : ""}
+        <div class="row"><button class="primary" data-act="resume">Resume race</button><button data-act="discardsave">Discard it</button></div></div>`; })()}
     <div class="panel">
       <div class="label">Seats, in turn order</div>
       ${seats}
@@ -2467,6 +2518,8 @@ document.addEventListener("click", e => {
     case "addseat": if (S.seats.length < 4) { const i = S.seats.length; S.seats.push({ name: "Bot " + ["Kit", "Juno", "Moss", "Pike"][i], bot: true, musher: "Random" }); store.set("seats", S.seats); renderSetup(); } break;
     case "rmseat": if (S.seats.length > 2) { S.seats.splice(+b.dataset.i, 1); store.set("seats", S.seats); renderSetup(); } break;
     case "start": startGame(); break;
+    case "resume": { const sv = savedRace(); if (sv) startGame(undefined, sv); break; }
+    case "discardsave": clearSave(); renderSetup(); break;
     case "legreset": case "stdreset": resetToStandard(); renderSetup(); break;
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
@@ -2570,7 +2623,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 1:21 PM";
+const LT_BUILD = "Oct 15, 1:33 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
