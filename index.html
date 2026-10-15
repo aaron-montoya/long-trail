@@ -261,13 +261,15 @@ button.ghost { background: transparent; }
 .setup .hero { padding: 18px 0 8px; }
 .setup .hero h1 { font-size: 40px; }
 .setup .hero p { color: var(--muted); max-width: 58ch; margin: 6px 0 0; }
-.seat { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto minmax(0, 170px) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
+.mvseat { display: flex; flex-direction: column; gap: 2px; }
+.mvseat button { padding: 0 7px; font-size: 11px; line-height: 16px; }
+.seat { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) auto minmax(0, 170px) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
 .seat input, .seat select, .opts select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; width: 100%; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg button { border: none; border-radius: 0; padding: 6px 12px; background: var(--bg); }
 .seg button.on { background: var(--fg); color: var(--bg); font-weight: 700; }
 .dot { width: 18px; height: 18px; border-radius: 50%; }
-@media (max-width: 560px) { .seat { grid-template-columns: 22px minmax(0, 1fr) auto; } .seat select { grid-column: 2 / 4; } .seat .rm { grid-column: 3; grid-row: 1; } }
+@media (max-width: 560px) { .seat { grid-template-columns: auto 22px minmax(0, 1fr) auto; } .seat .seg { grid-column: 3; } .seat select { grid-column: 3 / 5; } .seat .rm { grid-column: 4; grid-row: 1; } }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
 .opts { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 .artstat { font-size: 14px; }
@@ -1554,6 +1556,7 @@ function render() { if (S.screen === "setup") renderSetup(); else renderGame(tru
 function renderSetup() {
   const seats = S.seats.map((s, i) => `
     <div class="seat">
+      <span class="mvseat"><button data-act="seatup" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Move seat up" title="Move up">▲</button><button data-act="seatdown" data-i="${i}" ${i === S.seats.length - 1 ? "disabled" : ""} aria-label="Move seat down" title="Move down">▼</button></span>
       <span class="dot" style="background:${COLORS[i]}"></span>
       <input data-k="name" data-i="${i}" value="${esc(s.name)}" aria-label="Seat ${i + 1} name" maxlength="18">
       <span class="seg" role="group" aria-label="Seat ${i + 1} control">
@@ -2216,6 +2219,11 @@ document.addEventListener("click", e => {
   switch (act) {
     // setup
     case "ctl": S.seats[+b.dataset.i].bot = b.dataset.v === "b"; if (S.seats[+b.dataset.i].bot && !/^bot/i.test(S.seats[+b.dataset.i].name)) S.seats[+b.dataset.i].name = "Bot " + ["Kit", "Juno", "Moss", "Pike"][+b.dataset.i]; store.set("seats", S.seats); renderSetup(); break;
+    case "seatup": case "seatdown": {
+      const i = +b.dataset.i, j = act === "seatup" ? i - 1 : i + 1;
+      if (j >= 0 && j < S.seats.length) { [S.seats[i], S.seats[j]] = [S.seats[j], S.seats[i]]; store.set("seats", S.seats); renderSetup(); }
+      break;
+    }
     case "addseat": if (S.seats.length < 4) { const i = S.seats.length; S.seats.push({ name: "Bot " + ["Kit", "Juno", "Moss", "Pike"][i], bot: true, musher: "Random" }); store.set("seats", S.seats); renderSetup(); } break;
     case "rmseat": if (S.seats.length > 2) { S.seats.splice(+b.dataset.i, 1); store.set("seats", S.seats); renderSetup(); } break;
     case "start": startGame(); break;
