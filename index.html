@@ -1,0 +1,2328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Long Trail</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;800&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root {
+  --bg: #e9eef1; --bg2: #dde5ea; --panel: #f7f9fa; --line: #c3ced5; --fg: #1d2a33; --muted: #5d6d78;
+  --accent: #b5381f; --accent-fg: #fff; --good: #2f7a47; --bad: #a3321c; --sys: #6a5a9c;
+  --card: #f3e8d2; --card2: #e8d8b8; --ink: #3b2a1e; --ink-soft: #6e5640; --cardline: #b89a72;
+  --back: #31455a; --back2: #22323f; --hl: #f2b632; --shadow: 0 1px 2px rgba(20,30,40,.18), 0 3px 10px rgba(20,30,40,.10);
+  --p0: #c0392b; --p1: #2e6da4; --p2: #3d8b4f; --p3: #c58b12;
+  --lead: #2e6da4; --team: #3d8b4f; --wheel: #8a5a2b;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f161d; --bg2: #16212b; --panel: #18242f; --line: #2c3c49; --fg: #e3eaef; --muted: #93a4b1;
+  --accent: #e0623f; --accent-fg: #1a0f0a; --good: #6cc78b; --bad: #f08a6e; --sys: #b3a6e6;
+  --back: #3a5268; --back2: #26394a; --hl: #f2b632; --shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.35);
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f161d; --bg2: #16212b; --panel: #18242f; --line: #2c3c49; --fg: #e3eaef; --muted: #93a4b1;
+  --accent: #e0623f; --accent-fg: #1a0f0a; --good: #6cc78b; --bad: #f08a6e; --sys: #b3a6e6;
+  --back: #3a5268; --back2: #26394a; --hl: #f2b632; --shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.35);
+  color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.4 "Source Sans 3", system-ui, sans-serif; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 32px; max-width: 1400px; margin: 0 auto; }
+h1, h2, h3 { font-family: Bitter, Georgia, serif; text-wrap: balance; margin: 0; }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); padding: 7px 12px; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 700; }
+button.ghost { background: transparent; }
+.small { font-size: 13px; color: var(--muted); }
+.label { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+
+/* header */
+.top { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.top h1 { font-size: 22px; letter-spacing: .02em; }
+.top h1 span { color: var(--accent); }
+.top .meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
+.clock { font-variant-numeric: tabular-nums; font-size: 15px; align-self: center; padding: 0 4px; }
+.clock b { font-family: Bitter, Georgia, serif; font-size: 18px; }
+.top .tools { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* cards */
+:root { --handw: 150px; --stripw: 96px; }
+.card { --w: 104px; width: var(--w); aspect-ratio: 63 / 88; max-width: 100%; border-radius: calc(var(--w) * .07); background: var(--card); color: var(--ink);
+  border: 1px solid var(--cardline); box-shadow: var(--shadow); position: relative; overflow: hidden; flex: none;
+  font-size: calc(var(--w) * .095); line-height: 1.15; display: flex; flex-direction: column; user-select: none; }
+.card img.art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.card .ct { font-family: Bitter, Georgia, serif; font-weight: 800; font-size: 1.12em; padding: .45em .5em .1em; letter-spacing: .01em; }
+.card .cs { padding: 0 .55em; color: var(--ink-soft); font-size: .82em; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+.card .cx { padding: .35em .55em; font-size: .86em; flex: 1; overflow: hidden; }
+.card .big { font-family: Bitter, Georgia, serif; font-weight: 800; font-size: 2.6em; line-height: 1; }
+.card .band { height: .5em; flex: none; }
+.card.back { background: repeating-linear-gradient(135deg, var(--back) 0 6px, var(--back2) 6px 12px); border-color: var(--back2); color: #e9eef1; align-items: center; justify-content: center; text-align: center; }
+.card.back .bt { font-family: Bitter, Georgia, serif; font-weight: 800; font-size: 1.05em; letter-spacing: .12em; background: var(--back2); padding: .3em .45em; border-radius: .3em; }
+.card.dog .band.Lead { background: var(--lead); } .card.dog .band.Team { background: var(--team); } .card.dog .band.Wheel { background: var(--wheel); }
+.dogspeed { display: flex; align-items: flex-end; justify-content: space-between; padding: 0 .55em .45em; }
+.dogspeed .tiredv { font-weight: 700; font-size: .9em; color: var(--ink-soft); }
+.card.gear .band { background: #8b6b3d; } .card.event .band { background: #4b5d73; } .card.musher .band { background: var(--accent); }
+.card.trail .band { background: #6f8796; }
+.card.trail .tc { position: absolute; right: .35em; top: .25em; font-family: Bitter, serif; font-weight: 800; font-size: 2em; }
+.card.cp { background: #e6dcc5; } .card.cp .band, .card.finish .band { background: var(--accent); }
+.rew { display: inline-block; font-size: .8em; font-weight: 700; padding: .1em .35em; border-radius: .3em; background: var(--ink); color: var(--card); margin: 0 .55em .4em; }
+.card .stateflag { position: absolute; left: 50%; bottom: .4em; transform: translateX(-50%); background: var(--ink); color: var(--card); font-size: .8em; padding: .1em .45em; border-radius: 1em; font-weight: 700; white-space: nowrap; }
+.card .stateflag.top { left: auto; right: .35em; bottom: auto; top: .35em; transform: none; }
+.card.sel { outline: 3px solid var(--hl); outline-offset: 2px; }
+.card.pick { cursor: pointer; }
+.card.pick:hover { transform: translateY(-3px); }
+.card.dim { opacity: .45; }
+.card.tired-art img.art { transform: rotate(180deg); }
+.card.tired-txt { background: var(--card2); }
+.exhwrap { width: calc(var(--w, 104px) * 1.397); height: var(--w, 104px); position: relative; flex: none; }
+.exhwrap .card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(90deg); }
+.exhwrap .card .ct, .exhwrap .card .cx, .exhwrap .card .cs, .exhwrap .card .dogspeed { visibility: visible; }
+.order { position: absolute; top: .3em; right: .3em; width: 1.7em; height: 1.7em; border-radius: 50%; background: var(--hl); color: #2a1c0a; font-weight: 800; display: grid; place-items: center; font-size: 1em; z-index: 3; }
+
+/* trail strip */
+.stripbox { background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; overflow-x: auto; }
+.strip { display: flex; gap: 8px; align-items: flex-start; min-width: max-content; }
+.slot { display: flex; flex-direction: column; align-items: center; gap: 4px; width: calc(var(--stripw) + 4px); flex: none; }
+.slot .card { --w: var(--stripw); }
+.tokens { display: flex; gap: 3px; height: 24px; flex-wrap: wrap; justify-content: center; }
+.tok { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 12px; border: 2px solid rgba(255,255,255,.8); box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.slotlab { font-size: 11.5px; color: var(--muted); font-weight: 600; text-align: center; }
+.slot.proj .card { outline: 3px dashed var(--hl); outline-offset: 2px; }
+.slot.projend .card { outline: 3px solid var(--hl); outline-offset: 2px; }
+.slot .rewmini { --w: calc(var(--stripw) * .7); margin-top: -2px; }
+.board .card { --w: var(--handw); }
+[data-zoom] { cursor: zoom-in; }
+.card.pick { cursor: pointer; }
+.zoomb { position: absolute; left: .3em; top: .3em; z-index: 4; width: 2.1em; height: 2.1em; min-width: 26px; min-height: 26px; padding: 0; border-radius: 50%; font-size: max(12px, .9em); line-height: 1; background: rgba(255,255,255,.85); color: #2a1c0a; border: 1px solid rgba(0,0,0,.25); display: grid; place-items: center; }
+.zoomview { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+.zoomview .card { --w: min(340px, 78vw); cursor: default; }
+.zoomview .zt { flex: 1 1 220px; min-width: 0; }
+.zoomview .zt h3 { font-size: 24px; }
+.zoomview .zt p { margin: 8px 0 0; max-width: 46ch; }
+.sizer { display: inline-flex; }
+.startcard { width: 70px; height: 122px; border: 2px dashed var(--line); border-radius: 8px; display: grid; place-items: center; color: var(--muted); font-family: Bitter, serif; font-weight: 700; }
+
+/* players */
+.players { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin: 10px 0; }
+.pl { background: var(--panel); border: 1px solid var(--line); border-left: 6px solid var(--pc); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.pl.now { box-shadow: 0 0 0 2px var(--hl); }
+.pl.out { opacity: .55; }
+.pl .nm { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.pl .nm b { font-family: Bitter, serif; font-size: 16px; }
+.pl .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.chip { font-size: 12px; padding: 1px 7px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); white-space: nowrap; }
+.chip.warn { border-color: var(--bad); color: var(--bad); }
+.chip.ok { border-color: var(--good); color: var(--good); }
+.pl .last { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+/* main area */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 500px; gap: 10px; align-items: start; }
+.rail { display: flex; flex-direction: column; gap: 10px; position: sticky; top: max(8px, env(safe-area-inset-top, 0px)); min-width: 0; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } .rail { position: static; } }
+.board, .logbox, .runpanel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.board h2 { font-size: 18px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; margin-top: 6px; }
+.musherrow { display: flex; gap: 12px; align-items: flex-start; }
+.board .musherrow > .card { --w: calc(var(--handw) * .72); }
+.mtext { font-size: 14px; max-width: 52ch; min-width: 0; }
+.mtext .side { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); margin-top: 4px; }
+.mtext .side.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mtext .side.off { opacity: .6; }
+.waiting { padding: 18px; text-align: center; color: var(--muted); }
+
+/* in front of you */
+.tableau { margin-top: 12px; padding: 10px; border-radius: 10px; background: var(--bg2); border: 1px dashed var(--line); display: flex; gap: 16px; flex-wrap: wrap; min-height: 60px; }
+.tableau .tz { min-width: 0; }
+.tableau .tz .row { margin-top: 4px; }
+.board .tableau .card { --w: calc(var(--handw) * .8); }
+.tableau .empty { color: var(--muted); font-size: 13.5px; align-self: center; }
+
+/* the hand */
+.handzone { margin-top: 14px; }
+.hand { display: flex; justify-content: center; align-items: flex-end; padding: 34px 8px 8px; min-height: calc(var(--handw) * 1.4 + 46px); overflow: hidden; }
+.hc { position: relative; flex: none; margin-left: var(--ov, -24px); transform: translateY(var(--dy, 0)) rotate(var(--rot, 0deg)); transform-origin: 50% 130%; transition: transform .16s ease, margin .16s ease; z-index: var(--z, 1); }
+.hc:first-child { margin-left: 0; }
+.hc.gap { margin-left: calc(var(--ov, -24px) + 16px); }
+.hc:hover, .hc:focus-within { transform: translateY(-22px) rotate(0deg) scale(1.04); z-index: 30; }
+.hc.inline { transform: translateY(-14px) rotate(var(--rot, 0deg)); }
+.hc.inline .card { opacity: .45; }
+.hc .usebtn { position: absolute; left: 6px; bottom: 10px; z-index: 5; font-size: 13px; padding: 4px 12px; font-weight: 700; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.hand .empty { color: var(--muted); align-self: center; }
+@media (prefers-reduced-motion: reduce) { .hc { transition: none; } }
+
+/* run panel (right rail) */
+.runpanel h3 { font-size: 17px; }
+.acts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.acts .act { text-align: left; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.acts .act b { font-family: Bitter, serif; font-size: 16px; }
+.acts .act span { font-size: 12.5px; color: var(--muted); }
+.acts .act.primary span { color: inherit; opacity: .85; }
+.acts label { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.notes { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.lineend { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; text-align: center; padding: 4px 0; }
+.runlist { display: flex; flex-direction: column; gap: 6px; }
+.rs { display: grid; grid-template-columns: 22px 52px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); }
+.rs.dragging { opacity: .4; }
+.rs.over { border-color: var(--hl); box-shadow: 0 0 0 2px var(--hl) inset; }
+.rs .num { width: 22px; height: 22px; border-radius: 50%; background: var(--hl); color: #2a1c0a; font-weight: 800; display: grid; place-items: center; font-size: 12px; }
+.rs .card { --w: 52px; box-shadow: none; }
+.rs .who { min-width: 0; font-size: 13px; line-height: 1.25; }
+.rs .who b { font-family: Bitter, serif; font-size: 15px; }
+.rs .who .plus { color: var(--good); font-weight: 700; }
+.rs .ctl { display: flex; gap: 3px; }
+.rs .ctl button { padding: 3px 7px; font-size: 13px; }
+.rs[draggable="true"] { cursor: grab; }
+.emptyline { border: 2px dashed var(--line); border-radius: 10px; padding: 16px 10px; text-align: center; color: var(--muted); font-size: 13.5px; }
+.rungear { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.rungear label { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+.rungear label small { color: var(--muted); display: block; }
+.proj { font-size: 14px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.proj .spd { font-family: Bitter, serif; font-size: 30px; font-weight: 800; line-height: 1; }
+.breakdown { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.summary { margin: 8px 0 10px; padding: 12px; border-radius: 12px; background: var(--bg2); border: 1px solid var(--line); }
+.summary .vs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: start; margin-top: 6px; }
+.summary .verdict { align-self: center; }
+.summary .k { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.summary .big { font-family: Bitter, serif; font-weight: 800; font-size: 42px; line-height: 1; }
+.summary .big.ok { color: var(--good); } .summary .big.short { color: var(--bad); }
+.summary .verdict { font-weight: 800; font-size: 15px; padding-bottom: 6px; }
+.summary .verdict .ok { color: var(--good); } .summary .verdict .short { color: var(--bad); }
+.chips2 { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.chips2 s { opacity: .6; }
+.sumafter { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; }
+.sumafter b { font-family: Bitter, serif; }
+.warn { color: var(--bad); font-weight: 700; margin-top: 4px; font-size: 13.5px; }
+.gearpills { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.gearpills label { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+.gearpills label.on { border-color: var(--hl); background: color-mix(in srgb, var(--hl) 14%, transparent); }
+.gearpills small { color: var(--muted); }
+.target { margin: 8px 0 10px; padding: 10px 12px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); }
+.target .trow { display: flex; gap: 12px; align-items: center; margin-top: 2px; }
+.target .tbig { font-family: Bitter, serif; font-weight: 800; font-size: 40px; line-height: 1; min-width: 1.4ch; text-align: center; }
+.target .tnotes { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
+.tchip { display: inline-block; font-size: 12.5px; padding: 1px 8px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--fg); }
+.tchip.plus { border-color: var(--good); color: var(--good); margin-left: 4px; }
+.target .tneed { font-size: 14px; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.target .tneed b { font-family: Bitter, serif; font-size: 18px; margin: 0 2px; }
+.target .tstat { margin-top: 6px; font-weight: 700; font-size: 14px; }
+.target .ok { color: var(--good); } .target .short { color: var(--bad); }
+.breakdown.steps { color: var(--fg); padding: 6px 8px; border-radius: 8px; background: var(--bg2); }
+.breakdown.steps b { font-family: Bitter, serif; }
+.runbtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.runbtns .primary { flex: 1 1 100%; font-size: 17px; padding: 10px; }
+
+.logbox { margin-top: 10px; }
+.logbox summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; list-style: none; }
+.logbox summary::-webkit-details-marker { display: none; }
+.logbox summary::before { content: "▸"; color: var(--muted); }
+.logbox[open] summary::before { content: "▾"; }
+.logbox summary .small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logbox[open] summary .small { display: none; }
+.log { overflow-y: auto; font-size: 13.5px; max-height: 280px; margin-top: 6px; }
+.zzbox { position: relative; margin: 4px auto; max-width: 100%; }
+.zz { position: absolute; width: calc(var(--zw) + var(--side)); display: flex; gap: 4px; align-items: center; }
+.zz.l { flex-direction: row-reverse; }
+.zz.r { flex-direction: row; }
+.zz .card { --w: var(--zw); }
+.zz.dragging { opacity: .35; }
+.zz.over .card { outline: 3px solid var(--hl); outline-offset: 2px; }
+.zz[draggable="true"] { cursor: grab; }
+.zzspd { background: var(--good); color: #fff; font-weight: 800; font-size: 12.5px; padding: 1px 0; border-radius: 10px; text-align: center; width: 30px; }
+.zznum { width: 30px; height: 24px; border-radius: 12px; background: var(--hl); color: #2a1c0a; font-weight: 800; display: grid; place-items: center; font-size: 13px; }
+.zzctl { display: flex; flex-direction: column; gap: 3px; width: 30px; flex: none; }
+.zzctl button { padding: 3px 0; font-size: 12px; width: 30px; }
+.log div { padding: 2px 0; border-bottom: 1px dotted var(--line); }
+.log .round { font-family: Bitter, serif; font-weight: 700; color: var(--fg); border-bottom: 1px solid var(--line); padding-top: 8px; }
+.log .ev { color: var(--sys); } .log .good { color: var(--good); } .log .bad { color: var(--bad); } .log .win { color: var(--accent); font-weight: 700; }
+.log .act { color: var(--fg); } .log .sys { color: var(--muted); font-style: italic; }
+.log .fresh { background: color-mix(in srgb, var(--hl) 22%, transparent); }
+
+.times { border-collapse: collapse; font-size: 14px; margin: 6px 0; }
+.times th, .times td { text-align: left; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.times th { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* modal */
+.scrim { position: fixed; inset: 0; background: rgba(10,16,22,.55); display: grid; place-items: center; z-index: 50; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.modal { background: var(--panel); color: var(--fg); border-radius: 14px; padding: 18px; max-width: 760px; width: 100%; max-height: 100%; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+.modal h3 { font-size: 20px; margin-bottom: 4px; }
+.modal .cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 14px 0; }
+.modal .cards .card { --w: min(170px, 40vw); }
+.modal .btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.pass { text-align: center; }
+.pass .who { font-family: Bitter, serif; font-size: 30px; font-weight: 800; margin: 8px 0 16px; }
+
+/* setup */
+.setup { max-width: 760px; margin: 0 auto; }
+.setup .hero { padding: 18px 0 8px; }
+.setup .hero h1 { font-size: 40px; }
+.setup .hero p { color: var(--muted); max-width: 58ch; margin: 6px 0 0; }
+.seat { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto minmax(0, 170px) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
+.seat input, .seat select, .opts select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; width: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; padding: 6px 12px; background: var(--bg); }
+.seg button.on { background: var(--fg); color: var(--bg); font-weight: 700; }
+.dot { width: 18px; height: 18px; border-radius: 50%; }
+@media (max-width: 560px) { .seat { grid-template-columns: 22px minmax(0, 1fr) auto; } .seat select { grid-column: 2 / 4; } .seat .rm { grid-column: 3; grid-row: 1; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+.opts { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.artstat { font-size: 14px; }
+.legs { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 6px 0 4px; }
+.legs label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
+.legs select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); width: 80px; }
+.legs .legtotal { align-self: center; }
+.modes { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.modes label { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg); }
+.modes label small { display: block; color: var(--muted); font-size: 13px; }
+details.rules { margin-top: 10px; }
+details.rules summary { cursor: pointer; font-weight: 700; }
+details.rules ul { padding-left: 18px; margin: 6px 0; font-size: 14px; max-width: 75ch; }
+@media (max-width: 560px) {
+  :root { --stripw: 72px; }
+}
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script>
+/* Long Trail — rules engine + bots (no DOM). */
+const LT = (() => {
+  // ---------------- Card data ----------------
+  const DOGS = [
+    // name, role, rested, tired, ability key, text
+    ["Willow", "Lead", 2, 3, null, ""],
+    ["Comet", "Lead", 2, 2, "comet", "Her Lead bonus is +2."],
+    ["Scout", "Lead", 1, 2, "scout", "When Scout runs first, look at the next face-down trail."],
+    ["Alpine", "Lead", 1, 1, "ignore1", "When Alpine runs, ignore the first Event you draw this turn."],
+    ["Nanook", "Lead", 2, 2, "nanook", "When Nanook runs, Spruce Forest and Exposed Ridge cost 1 less."],
+    ["Kestrel", "Lead", 3, 2, "flighty", "Her Lead bonus counts only if 3 or more dogs run."],
+    ["Birch", "Lead", 1, 2, "birch", "If Birch runs first, the second dog in line gets +2."],
+    ["Aurora", "Lead", 3, 3, "ignore1", "When Aurora runs, ignore the first Event you draw this turn."],
+    ["Bramble", "Team", 2, 3, null, ""],
+    ["Ember", "Team", 3, 2, null, ""],
+    ["Dash", "Team", 3, 1, null, ""],
+    ["Mitts", "Team", 2, 2, "mitts", "+2 if directly behind a Lead dog."],
+    ["Echo", "Team", 2, 2, "echo", "+1 for each Team dog ahead of Echo in line."],
+    ["Northstar", "Team", 2, 3, "tireless", "After running rested, Northstar returns to your hand instead of becoming tired."],
+    ["Flash", "Team", 4, 2, "fragile", "If an Event removes a dog while Flash is tired or exhausted, remove Flash."],
+    ["Tundra", "Team", 1, 2, "packer", "+1 speed for each other dog in line."],
+    ["Ranger", "Team", 2, 2, "scavenger", "If Ranger runs onto a reward trail, also take the top Gear card."],
+    ["Cocoa", "Team", 2, 2, "cocoa", "While Cocoa is in your hand, when you camp in the open, draw 2 Events and choose 1."],
+    ["Tinker", "Team", 1, 2, "tinker", "When Tinker runs, return one used gear to your hand."],
+    ["Ollie", "Team", 1, 2, "underdog", "+2 if you have fewer dogs than every other musher."],
+    ["Shadow", "Team", 3, 3, "shadow", "River Ice and Exposed Ridge never make you draw Events."],
+    ["Bear", "Wheel", 3, 2, null, ""],
+    ["Old Ben", "Wheel", 2, 3, null, ""],
+    ["Tank", "Wheel", 3, 3, "heavy", "If Tank runs, you can't move onto River Ice this Run."],
+    ["Anvil", "Wheel", 2, 2, "anvil", "+1 if 4 or more dogs run."],
+    ["Brick", "Wheel", 1, 3, null, ""],
+    ["Yukon", "Wheel", 3, 3, "lastonly", "Must run last in line."],
+    ["Huckle", "Wheel", 2, 2, "rearguard", "While Huckle is in your hand, Squirrel! and Moose on the Trail have no effect on you."],
+    ["Boulder", "Wheel", 4, 3, "hardy", "The first time a Wheel dog would be removed each race, he becomes exhausted instead."],
+  ];
+
+  const GEAR = [
+    ["Snack", 4, "run", "+2 Speed this Run."],
+    ["Booties", 3, "run", "Tired dogs on this Run don't make you draw Events."],
+    ["Dog Food", 3, "free", "Return one exhausted dog to your hand."],
+    ["Snow Hook", 3, "run", "Mountain Pass and Deep Powder cost 2 less this Run."],
+    ["Headlamp", 3, "free", "Look at the next two face-down trails."],
+    ["Sled Basket", 2, "react", "Play when a dog would be removed: it becomes exhausted instead. Then remove Sled Basket from the game."],
+    ["Bivy Sack", 3, "camp", "Play when you camp in the open: draw no Event."],
+    ["Wax the Runners", 2, "run", "Every trail costs 1 less this Run (minimum 1)."],
+    ["Whistle", 2, "free", "Return one tired dog to your hand."],
+    ["Hot Broth", 2, "free", "Return all your tired dogs to your hand."],
+    ["Red Lantern", 1, "slog", "Slog without drawing an Event."],
+    ["Golden Harness", 1, "run", "Double your Lead bonus this Run."],
+  ];
+  const GEAR_INFO = Object.fromEntries(GEAR.map(g => [g[0], { when: g[2], text: g[3] }]));
+
+  const TRAILS = [
+    ["Snowfield", 6, null], ["Snowfield", 6, "gear"], ["Snowfield", 7, null], ["Snowfield", 7, null], ["Snowfield", 7, "gear"],
+    ["River Ice", 6, "gear"], ["River Ice", 7, "gear"], ["River Ice", 7, "dog"],
+    ["Spruce Forest", 7, null], ["Spruce Forest", 8, "gear"], ["Spruce Forest", 8, null],
+    ["Exposed Ridge", 7, "gear"], ["Exposed Ridge", 8, "dog"], ["Exposed Ridge", 8, "gear"],
+    ["Deep Powder", 9, "gear"], ["Deep Powder", 9, null], ["Deep Powder", 10, null],
+    ["Mountain Pass", 9, "dog"], ["Mountain Pass", 9, "gear"], ["Mountain Pass", 10, "gear"],
+  ];
+  const TERRAIN = {
+    "Snowfield": "",
+    "River Ice": "If 3 or more dogs run onto this trail, draw 1 Event.",
+    "Spruce Forest": "When you camp here, draw no Event.",
+    "Exposed Ridge": "If you end your turn here, draw 1 Event.",
+    "Deep Powder": "Drafting saves 3 here instead of 1.",
+    "Mountain Pass": "Rested Wheel dogs count their Speed twice."
+  };
+  const CP_TEXT = "Camp here once to draw 2 dogs and take 1 gear. Draw no Event. Long rest to draw 3 dogs and keep 2, draw 2 gear and keep 1, all used gear returns, then skip a turn. Draw no Event.";
+  const FINISH_TEXT = "The first Musher to reach the Finish wins!";
+
+  const EVENTS = [
+    ["Clear Skies", 2, "No effect."],
+    ["Northern Lights", 1, "Keep this card. Your next Run gets +2 Speed, then discard it."],
+    ["Tailwind", 2, "Keep this card. Your next Run gets +1 Speed, then discard it."],
+    ["Fresh Snow", 2, "Keep this card. On your next Run, every trail costs 1 more Speed to move onto. Then discard this card."],
+    ["Bitter Cold", 8, "Remove one dog, tired or exhausted first."],
+    ["Blizzard", 3, "Remove one dog, tired or exhausted first. Then move back one trail, but never past a checkpoint."],
+    ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
+    ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Remove it, unless you have a rested Wheel dog in your hand."],
+    ["Whiteout", 2, "Remove one tired or exhausted dog. Skip your next turn. Turn your musher sideways as a reminder."],
+    ["Sore Paws", 2, "One of your tired dogs becomes exhausted."],
+    ["Steep Climb", 1, "All your tired dogs become exhausted."],
+    ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
+  ];
+  const EVENT_TEXT = Object.fromEntries(EVENTS.map(e => [e[0], e[2]]));
+  const HARSH = {
+    "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
+    "Moose on the Trail": 5, "Steep Climb": 5, "Whiteout": 6, "Bitter Cold": 7, "Squirrel!": 7, "Blizzard": 8,
+  };
+
+  const MUSHERS = {
+    "Sprinter": ["Every Run gets +2 Speed.", "Every Run gets +1 Speed."],
+    "Champion": ["Your Lead bonus is +2.", "Every Run gets +2 Speed."],
+    "Trailbreaker": ["Trails no musher has reached yet cost you 2 less.", "Trails no musher has reached yet cost you 1 less. When you take a trail reward, also take the top Gear card."],
+    "Rookie": ["Once per leg, ignore an Event you draw.", "Every Run gets +1 Speed."],
+    "Night Runner": ["Your first Run after camping gets +4 Speed.", "Your first Run after camping gets +3 Speed. Camping in the open makes you draw no Event."],
+    "Veteran": ["Slogging never makes you draw an Event.", "Final-leg trails cost you 1 less."],
+    "Gambler": ["Whenever you draw an Event, draw 2 and choose 1.", "Each tired dog you push gets +1 Speed."],
+    "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 3 extra and choose which to keep. When you take a trail reward, also take the top card of the Dog deck.", "When you take a trail reward or camp in the open, also take the top card of the Dog deck."],
+  };
+  const MUSHER_NAMES = Object.keys(MUSHERS);
+  const FINISH_COST = 2;
+  const UNKNOWN_COST = 7.75;
+
+  // ---------------- RNG ----------------
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let uid = 0;
+  const nid = (k) => k + (++uid);
+
+  // ---------------- Game ----------------
+  class Game {
+    constructor(opts) {
+      this.io = opts.io || {};
+      this.seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+      this.mode = opts.mode || "standard";
+      this.rules = opts.rules || {};
+      this.r = rng(this.seed);
+      this.round = 0;
+      this.turnIdx = 0;
+      this.winner = null;
+      this.over = false;
+      this.logLines = [];
+      this.stats = { events: 0, removed: 0 };
+
+      const trails = TRAILS.map(t => ({ id: nid("t"), type: "T", name: t[0], cost: t[1], rtype: t[2], up: false, reward: null }));
+      this.shuffle(trails);
+      const legs = (opts.legs && opts.legs.length === 3 ? opts.legs : [2, 3, 5]).map(n => Math.max(1, Math.min(8, n | 0)));
+      while (legs.reduce((x, y) => x + y, 0) > trails.length) legs[legs.indexOf(Math.max(...legs))]--;
+      this.legs = legs;
+      this.path = [];
+      let k = 0;
+      legs.forEach((n, li) => {
+        for (let i = 0; i < n; i++) this.path.push(trails[k++]);
+        if (li < 2) this.path.push({ id: nid("c"), type: "CP", cp: li + 1 });
+      });
+      this.path.push({ id: nid("f"), type: "F", cost: FINISH_COST });
+      this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
+
+      this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], state: "rested", hardyUsed: false })));
+      this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
+      this.eventDeck = this.shuffle(EVENTS.flatMap(e => Array.from({ length: e[1] }, () => e[0])));
+      this.eventDiscard = [];
+
+      const pool = this.shuffle(MUSHER_NAMES.slice());
+      this.players = opts.players.map((pd, i) => {
+        let m = pd.musher && pd.musher !== "Random" ? pd.musher : null;
+        if (m) pool.splice(pool.indexOf(m), 1);
+        return { idx: i, name: pd.name || `Player ${i + 1}`, bot: !!pd.bot, musher: m, color: pd.color,
+          dogs: [], gear: [], used: [], lost: [], pos: -1, camped: new Set(), longRested: false,
+          skip: 0, flipAfterSkip: false, after: false, runBonus: 0, costMod: 0, keptEvents: [],
+          campedLast: false, scratched: false, slogLegs: new Set(), rookieLegs: new Set(), ignoreLeft: 0,
+          shadowTurn: false, turns: 0 };
+      });
+      this.players.forEach(p => { if (!p.musher) p.musher = pool.pop(); });
+      this.flip(0);
+      this.players.forEach((p, i) => {
+        for (let j = 0; j < 3; j++) p.dogs.push(this.dogDeck.pop());
+        for (let j = 0; j < 1 + i; j++) if (this.gearDeck.length) p.gear.push(this.gearDeck.pop());
+      });
+    }
+
+    shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(this.r() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    log(msg, cls) {
+      const line = { round: this.round, msg, cls };
+      this.logLines.push(line);
+      this.io.log && this.io.log(line);
+    }
+    upd() { this.io.update && this.io.update(); }
+    async ask(p, req) {
+      if (p.bot) return Bot.answer(this, p, req);
+      return await this.io.ask(p, req);
+    }
+    async tell(p, req) { // information for a human; bots ignore
+      if (!p.bot && this.io.ask) await this.io.ask(p, req);
+    }
+
+    // ---------- helpers ----------
+    alive(p) { return p.dogs; }
+    rested(p) { return p.dogs.filter(d => d.state === "rested"); }
+    tired(p) { return p.dogs.filter(d => d.state === "tired"); }
+    exh(p) { return p.dogs.filter(d => d.state === "exh"); }
+    label(pos) {
+      if (pos < 0) return "the start";
+      const c = this.path[pos];
+      if (c.type === "CP") return `Checkpoint ${c.cp}`;
+      if (c.type === "F") return "the Finish";
+      return c.up ? `${c.name} (trail ${this.trailNo(pos)})` : `trail ${this.trailNo(pos)}`;
+    }
+    trailNo(pos) { return this.path.slice(0, pos + 1).filter(c => c.type === "T").length; }
+    legOf(pos) { if (pos < this.cpIdx[0]) return 0; if (pos < this.cpIdx[1]) return 1; return 2; }
+    finalLeg(pos) { return pos > this.cpIdx[1]; }
+    phase(p) { return p.after ? 1 : 0; }
+
+    flip(i) {
+      const c = this.path[i];
+      if (!c || c.type !== "T" || c.up) return;
+      c.up = true;
+      if (c.rtype === "dog" && this.dogDeck.length) c.reward = { kind: "dog", card: this.dogDeck.pop() };
+      else if (c.rtype === "gear" && this.gearDeck.length) c.reward = { kind: "gear", card: this.gearDeck.pop() };
+    }
+    onMoveOnto(i) {
+      const j = i + 1;
+      if (j >= this.path.length) return;
+      if (this.path[j].type === "CP") this.flip(j + 1); else this.flip(j);
+    }
+    nextFaceDown(p, n) {
+      const out = [];
+      for (let i = Math.max(p.pos + 1, 0); i < this.path.length && out.length < n; i++) {
+        const c = this.path[i];
+        if (c.type === "T" && !c.up) out.push(i);
+      }
+      return out;
+    }
+
+    // ---------- speed & cost ----------
+    // line: [{dog, st}] in running order
+    leadBonus(p, line, gearSel) {
+      if (!line.length) return 0;
+      const f = line[0];
+      if (f.st !== "rested" || f.dog.role !== "Lead") return 0;
+      let b = f.dog.ab === "comet" ? 2 : 1;
+      if (f.dog.ab === "flighty" && line.length < 3) b = 0;
+      if (b && p.musher === "Champion" && !p.after) b += 1;
+      if (gearSel.some(g => g.name === "Golden Harness")) b *= 2;
+      return b;
+    }
+    speedOf(p, line, gearSel = []) {
+      const parts = [];
+      let total = 0;
+      const add = (v, why) => { if (v) { total += v; parts.push([why, v]); } };
+      line.forEach((x, i) => {
+        const d = x.dog;
+        if (x.st === "tired") { add(d.ts, `${d.name} (tired)`); return; }
+        let v = d.rs;
+        if (d.ab === "mitts" && i > 0 && line[i - 1].dog.role === "Lead") v += 2;
+        if (d.ab === "echo") v += line.slice(0, i).filter(y => y.dog.role === "Team").length;
+        if (d.ab === "packer") v += line.length - 1;
+        if (d.ab === "anvil" && line.length >= 4) v += 1;
+        if (d.ab === "underdog") {
+          const others = this.players.filter(q => q !== p && !q.scratched);
+          if (others.length && others.every(q => p.dogs.length < q.dogs.length)) v += 2;
+        }
+        if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
+        add(v, d.name);
+      });
+      add(this.leadBonus(p, line, gearSel), "Lead bonus");
+      if (line.length && line[line.length - 1].st === "rested" && line[line.length - 1].dog.role === "Wheel") add(1, "Wheel bonus");
+      const m = p.musher, af = p.after;
+      if (m === "Sprinter") add(af ? 1 : 2, "Sprinter");
+      if (m === "Champion" && af) add(2, "Champion");
+      if (m === "Rookie" && af) add(1, "Rookie");
+      if (m === "Night Runner" && p.campedLast) add(af ? 3 : 4, "Night Runner");
+      if (m === "Gambler" && af) add(line.filter(x => x.st === "tired").length, "Gambler");
+      add(p.runBonus, "Kept Events");
+      add(2 * gearSel.filter(g => g.name === "Snack").length, "Snack");
+      return { total, parts };
+    }
+    trailCost(p, i, line, gearSel = [], known = true) {
+      const c = this.path[i];
+      if (c.type === "F") return FINISH_COST;
+      if (c.type === "CP") return 0;
+      if (!c.up && !known) return null;
+      let cost = c.cost;
+      const reached = this.players.some(q => q !== p && !q.scratched && q.pos >= i);
+      if (reached) cost -= c.name === "Deep Powder" ? 3 : 1;
+      else if (p.musher === "Trailbreaker") cost -= p.after ? 1 : 2;
+      const rl = line.filter(x => x.st === "rested").map(x => x.dog);
+      if (c.name === "Mountain Pass") cost -= rl.filter(d => d.role === "Wheel").reduce((s, d) => s + d.rs, 0);
+      if (rl.some(d => d.ab === "nanook") && (c.name === "Spruce Forest" || c.name === "Exposed Ridge")) cost -= 1;
+      if (p.musher === "Veteran" && p.after && this.finalLeg(i)) cost -= 1;
+      cost += p.costMod;
+      cost = Math.max(1, cost);
+      if (gearSel.some(g => g.name === "Wax the Runners")) cost = Math.max(1, cost - 1);
+      if (gearSel.some(g => g.name === "Snow Hook") && (c.name === "Mountain Pass" || c.name === "Deep Powder")) cost = Math.max(1, cost - 2);
+      return cost;
+    }
+    canPassCP(p, i) {
+      const c = this.path[i];
+      return !(c.type === "CP" && c.cp === 2 && !p.longRested);
+    }
+    // Preview a run without changing anything. stopAtCP: "ask" -> treat as continue (human) / bot policy
+    preview(p, line, gearSel = [], opts = {}) {
+      const known = opts.known !== false;
+      const sp = this.speedOf(p, line, gearSel);
+      let pool = sp.total, pos = p.pos, crossed = 0, finished = false, unknownHit = false, hiddenNext = false, tankBlock = false;
+      const heavy = line.some(x => x.st === "rested" && x.dog.ab === "heavy");
+      const steps = [];
+      while (true) {
+        const nxt = pos + 1;
+        if (nxt >= this.path.length) break;
+        if (pos >= 0 && this.path[pos].type === "CP") {
+          if (!this.canPassCP(p, pos)) break;
+          if (opts.stopAtNewCP && crossed > 0 && !p.camped.has(this.path[pos].cp)) break;
+        }
+        const c = this.path[nxt];
+        if (opts.stopAtHidden && c.type === "T" && !c.up) { hiddenNext = true; break; }
+        if (c.type === "T" && c.name === "River Ice" && heavy && c.up) { tankBlock = true; break; }
+        let cost = this.trailCost(p, nxt, line, gearSel, true);
+        if (c.type === "T" && !c.up && !known) { cost = UNKNOWN_COST; unknownHit = true; }
+        if (cost > pool) break;
+        pool -= cost; pos = nxt; crossed++;
+        steps.push({ pos, cost, up: c.type !== "T" || c.up });
+        if (c.type === "F") { finished = true; break; }
+        if (nxt + 1 < this.path.length && this.path[nxt + 1].type === "CP") {
+          pos = nxt + 1;
+          steps.push({ pos, cost: 0, up: true });
+        }
+      }
+      return { speed: sp.total, parts: sp.parts, crossed, finished, end: pos, left: pool, steps, unknownHit, hiddenNext, tankBlock };
+    }
+
+    // ---------- events ----------
+    drawEvent() {
+      if (!this.eventDeck.length) {
+        this.eventDeck = this.shuffle(this.eventDiscard);
+        this.eventDiscard = [];
+        this.log("The Event deck is reshuffled.", "sys");
+      }
+      const e = this.eventDeck.pop();
+      this.eventDiscard.push(e);
+      this.stats.events++;
+      return e;
+    }
+    async event(p, source, opts = {}) {
+      if (p.scratched || this.over) return;
+      let choose2 = !!opts.choose2;
+      if (p.musher === "Gambler" && !p.after) choose2 = true;
+      let e;
+      if (choose2) {
+        const a = this.drawEvent(), b = this.drawEvent();
+        const pick = await this.ask(p, { type: "pickEvent", options: [a, b], source });
+        e = [a, b][pick] || a;
+        this.log(`${p.name} draws ${a} and ${b} (${source}) and chooses ${e}.`, "ev");
+      } else {
+        e = this.drawEvent();
+        this.log(`${p.name} draws an Event (${source}): ${e}.`, "ev");
+      }
+      if (p.ignoreLeft > 0) {
+        p.ignoreLeft--;
+        this.log(`${p.name}'s lead dog shrugs it off: ${e} is ignored.`, "good");
+        await this.tell(p, { type: "event", card: e, source, ignored: "Your lead dog (Alpine or Aurora) ignores this Event." });
+        return;
+      }
+      if (p.musher === "Rookie" && !p.after) {
+        const leg = this.legOf(Math.max(p.pos, 0));
+        if (!p.rookieLegs.has(leg) && HARSH[e] >= 3) {
+          const use = await this.ask(p, { type: "rookieIgnore", card: e, source });
+          if (use) {
+            p.rookieLegs.add(leg);
+            this.log(`${p.name} (Rookie) ignores ${e}.`, "good");
+            return;
+          }
+        }
+      }
+      await this.tell(p, { type: "event", card: e, source });
+      await this.applyEvent(p, e);
+      this.upd();
+    }
+    async applyEvent(p, e) {
+      const harsh = this.finalLeg(p.pos) && !this.rules.noHarsh;
+      const n = harsh ? 2 : 1;
+      const huckle = p.dogs.some(d => d.ab === "rearguard" && d.state === "rested");
+      switch (e) {
+        case "Northern Lights": p.runBonus += 2; p.keptEvents.push(e); break;
+        case "Tailwind": p.runBonus += 1; p.keptEvents.push(e); break;
+        case "Fresh Snow": p.costMod += 1; p.keptEvents.push(e); break;
+        case "Bitter Cold": for (let i = 0; i < n; i++) await this.removeDog(p, true, e, i + 1, n); break;
+        case "Blizzard":
+          for (let i = 0; i < n; i++) await this.removeDog(p, true, e, i + 1, n);
+          if (!p.scratched) this.moveBack(p);
+          break;
+        case "Moose on the Trail": {
+          if (huckle) { this.log(`Huckle stares down the moose. No effect.`, "good"); break; }
+          const t = this.tired(p);
+          if (t.length) await this.exhaustOne(p, e);
+          else this.moveBack(p);
+          break;
+        }
+        case "Squirrel!":
+          if (huckle || p.dogs.some(d => d.role === "Wheel" && d.state === "rested")) { this.log(`A rested Wheel dog keeps the team in line. No effect.`, "good"); break; }
+          for (let i = 0; i < n; i++) await this.removeDog(p, false, e, i + 1, n);
+          break;
+        case "Whiteout":
+          for (let i = 0; i < n; i++) await this.removeDog(p, false, e, i + 1, n);
+          p.skip += 1;
+          this.log(`${p.name} will skip their next turn.`, "bad");
+          break;
+        case "Sore Paws": if (this.tired(p).length) await this.exhaustOne(p, e); break;
+        case "Steep Climb": this.tired(p).forEach(d => d.state = "exh"); break;
+        case "Lost Bootie":
+          if (p.gear.length) {
+            const id = await this.ask(p, { type: "lostBootie", options: p.gear.map(g => g.id) });
+            const g = p.gear.find(x => x.id === id) || p.gear[0];
+            p.gear.splice(p.gear.indexOf(g), 1);
+            this.gearDeck.unshift(g);
+            this.log(`${p.name} loses ${g.name} to the bottom of the Gear deck.`, "bad");
+          }
+          break;
+      }
+    }
+    async exhaustOne(p, cause) {
+      const t = this.tired(p);
+      if (!t.length) return;
+      const id = t.length === 1 && p.bot ? t[0].id : await this.ask(p, { type: "exhaustDog", options: t.map(d => d.id), all: p.dogs.map(d => d.id), cause, reason: "Only a tired dog can be chosen." });
+      const d = t.find(x => x.id === id) || t[0];
+      d.state = "exh";
+      this.log(`${d.name} is exhausted (${cause}).`, "bad");
+    }
+    moveBack(p) {
+      if (p.pos < 0) return;
+      if (p.pos === 0) { p.pos = -1; this.log(`${p.name} is pushed back to the start.`, "bad"); return; }
+      if (this.path[p.pos].type === "CP" || this.path[p.pos - 1].type === "CP") return;
+      p.pos -= 1;
+      this.log(`${p.name} moves back to ${this.label(p.pos)}.`, "bad");
+    }
+    async removeDog(p, restedOk, cause, k = 1, n = 1) {
+      if (p.scratched) return;
+      let pool = [...this.tired(p), ...this.exh(p)];
+      let reason = "You must choose a tired or exhausted dog.";
+      const flash = pool.filter(d => d.ab === "fragile");
+      if (flash.length) { pool = flash; reason = "Flash is tired or exhausted, so Flash must go."; }
+      if (!pool.length && restedOk) { pool = this.rested(p); reason = "You have no tired or exhausted dogs, so choose a rested one."; }
+      if (!pool.length) return;
+      const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: p.dogs.map(d => d.id), cause, reason, k, n });
+      const v = pool.find(d => d.id === id) || pool[0];
+      if (v.ab === "hardy" && !v.hardyUsed) {
+        v.hardyUsed = true; v.state = "exh";
+        this.log(`${v.name} is Hardy and only gets exhausted (${cause}).`, "good");
+        return;
+      }
+      const basket = p.gear.find(g => g.name === "Sled Basket");
+      if (basket) {
+        const use = await this.ask(p, { type: "sledBasket", dog: v.id, cause });
+        if (use) {
+          p.gear.splice(p.gear.indexOf(basket), 1);
+          v.state = "exh";
+          this.log(`${p.name} loads ${v.name} into the Sled Basket. It's exhausted instead of removed.`, "good");
+          return;
+        }
+      }
+      p.dogs.splice(p.dogs.indexOf(v), 1);
+      v.state = "removed";
+      p.lost.push(v);
+      this.stats.removed++;
+      this.log(`${v.name} heads home to rest by the fire (${cause}).`, "bad");
+      if (!p.dogs.length) {
+        p.scratched = true;
+        this.log(`${p.name} has no dogs left and is scratched.`, "bad");
+      }
+      this.upd();
+    }
+
+    // ---------- gains ----------
+    async drawDogs(p, draw, keep, source) {
+      const drawn = [];
+      for (let i = 0; i < draw && this.dogDeck.length; i++) drawn.push(this.dogDeck.pop());
+      if (!drawn.length) return;
+      let kept = drawn;
+      if (drawn.length > keep) {
+        const ids = await this.ask(p, { type: "keepDogs", options: drawn.map(d => d.id), cards: drawn, keep, source });
+        kept = drawn.filter(d => ids.includes(d.id)).slice(0, keep);
+        if (kept.length < keep) kept = kept.concat(drawn.filter(d => !kept.includes(d)).slice(0, keep - kept.length));
+      }
+      for (const d of kept) { d.state = "rested"; p.dogs.push(d); }
+      for (const d of drawn) if (!kept.includes(d)) this.dogDeck.splice(Math.floor(this.r() * (this.dogDeck.length + 1)), 0, d);
+      this.log(`${p.name} gains ${kept.map(d => d.name).join(" and ")} (${source}).`, "good");
+    }
+    takeGear(p, source) {
+      if (!this.gearDeck.length) return;
+      const g = this.gearDeck.pop();
+      p.gear.push(g);
+      this.log(`${p.name} takes ${p.bot ? "a gear" : g.name} (${source}).`, "good");
+    }
+    async claim(p, line, at = p.pos) {
+      const c = this.path[at];
+      if (!c || c.type !== "T" || !c.reward) return;
+      const { kind, card } = c.reward;
+      c.reward = null;
+      if (kind === "dog") { card.state = "rested"; p.dogs.push(card); }
+      else p.gear.push(card);
+      this.log(`${p.name} takes the trail reward: ${card.name}.`, "good");
+      if (p.musher === "Trapper") await this.drawDogs(p, 1, 1, "Trapper");
+      if (line.some(x => x.st === "rested" && x.dog.ab === "scavenger")) this.takeGear(p, "Ranger");
+      if (p.musher === "Trailbreaker" && p.after) this.takeGear(p, "Trailbreaker");
+    }
+
+    // ---------- actions ----------
+    legal(p) {
+      const here = p.pos >= 0 ? this.path[p.pos] : null;
+      const atOpenCP = here && here.type === "CP" && !p.camped.has(here.cp);
+      const nxt = p.pos + 1;
+      const slogDest = nxt < this.path.length && this.path[nxt].type !== "F" && !(here && here.type === "CP" && !this.canPassCP(p, p.pos)) ? nxt : null;
+      const slogLeg = slogDest != null ? this.legOf(slogDest) : null;
+      const canSlog = slogDest != null && !p.slogLegs.has(slogLeg);
+      // can run at all? (with every rested+tired dog, no gear)
+      return { atOpenCP, cp: atOpenCP ? here.cp : null, mustLongRest: atOpenCP && here.cp === 2 && !p.longRested,
+        canSlog, slogUsed: slogDest != null && p.slogLegs.has(slogLeg), canPass: !(here && here.type === "CP" && !this.canPassCP(p, p.pos)) };
+    }
+
+    async useFreeGear(p, gid, target) {
+      const g = p.gear.find(x => x.id === gid);
+      if (!g) return;
+      if (g.name === "Dog Food") {
+        const d = p.dogs.find(x => x.id === target && x.state === "exh") || this.exh(p)[0];
+        if (!d) return;
+        d.state = "rested";
+        this.log(`${p.name} uses Dog Food: ${d.name} is back in hand.`, "good");
+      } else if (g.name === "Whistle") {
+        const d = p.dogs.find(x => x.id === target && x.state === "tired") || this.tired(p)[0];
+        if (!d) return;
+        d.state = "rested";
+        this.log(`${p.name} uses a Whistle: ${d.name} is back in hand.`, "good");
+      } else if (g.name === "Hot Broth") {
+        if (!this.tired(p).length) return;
+        this.tired(p).forEach(d => d.state = "rested");
+        this.log(`${p.name} serves Hot Broth: all tired dogs are back in hand.`, "good");
+      } else if (g.name === "Headlamp") {
+        const ids = this.nextFaceDown(p, 2);
+        this.log(`${p.name} uses a Headlamp to look ahead.`, "");
+        await this.tell(p, { type: "peek", trails: ids, source: "Headlamp" });
+      } else return;
+      p.gear.splice(p.gear.indexOf(g), 1);
+      p.used.push(g);
+      this.upd();
+    }
+
+    async doRun(p, action) {
+      let line = action.line.map(x => ({ dog: p.dogs.find(d => d.id === x.id), st: null })).filter(x => x.dog);
+      if (this.rules.lineMax) line = line.slice(0, this.rules.lineMax);
+      line.forEach(x => x.st = x.dog.state);
+      let bigLineHit = false;
+      const runEvents = []; // trail Events from this Run resolve after the dogs are tired, like push Events
+      const gearSel = (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean);
+      const sp = this.speedOf(p, line, gearSel);
+      const pushed = line.filter(x => x.st === "tired");
+      if (line.some(x => x.st === "rested" && x.dog.ab === "ignore1")) p.ignoreLeft = 1;
+      p.shadowTurn = line.some(x => x.st === "rested" && x.dog.ab === "shadow");
+      const heavy = line.some(x => x.st === "rested" && x.dog.ab === "heavy");
+      // spend gear
+      for (const g of gearSel) { p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g); }
+      this.log(`${p.name} runs ${line.map(x => x.dog.name + (x.st === "tired" ? " (tired)" : "")).join(", ")}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}: Speed ${sp.total}.`, "act");
+      let pool = sp.total, crossed = 0;
+      const start = p.pos;
+      while (!this.over && !p.scratched) {
+        const pos = p.pos, nxt = pos + 1;
+        if (nxt >= this.path.length) break;
+        if (pos >= 0 && this.path[pos].type === "CP" && !this.canPassCP(p, pos)) break;
+        const c = this.path[nxt];
+        if (c.type === "T" && !c.up) this.flip(nxt);
+        if (c.type === "T" && c.name === "River Ice" && heavy) { this.log(`Tank refuses to step onto River Ice.`, ""); break; }
+        const cost = this.trailCost(p, nxt, line, gearSel);
+        if (cost > pool) break;
+        // at a checkpoint we entered this run: may stop
+        if (pos >= 0 && this.path[pos].type === "CP" && crossed > 0) {
+          const go = await this.ask(p, { type: "stopAtCP", cp: this.path[pos].cp, left: pool, nextCost: cost });
+          if (!go) { this.log(`${p.name} stops at Checkpoint ${this.path[pos].cp}.`, "act"); break; }
+        }
+        pool -= cost; p.pos = nxt; crossed++;
+        this.onMoveOnto(nxt);
+        this.upd();
+        if (c.type === "F") {
+          this.winner = p; this.over = true;
+          this.log(`${p.name} crosses the Finish and wins the Long Trail!`, "win");
+          this.upd();
+          return;
+        }
+        if (this.rules.bigLine && !bigLineHit && c.type === "T" && this.finalLeg(nxt) && line.length >= this.rules.bigLine) {
+          bigLineHit = true;
+          runEvents.push("a big team on the final leg");
+        }
+        if (c.type === "T" && c.name === "River Ice" && line.length >= 3 && !this.shadowSafe(p)) runEvents.push("River Ice");
+        if (nxt + 1 < this.path.length && this.path[nxt + 1].type === "CP") {
+          p.pos = nxt + 1;
+          this.onMoveOnto(nxt + 1);
+          this.log(`${p.name} reaches Checkpoint ${this.path[nxt + 1].cp}.`, "act");
+          await this.vetCheck(p, nxt + 1, line);
+          this.upd();
+        }
+      }
+      if (crossed === 0) this.log(`${p.name} can't make any progress.`, "");
+      else if (p.pos !== start) this.log(`${p.name} moves from ${this.label(start)} to ${this.label(p.pos)}.`, "act");
+      else this.log(`${p.name} ends the Run back at ${this.label(p.pos)}.`, "act");
+      if (!p.scratched && crossed > 0) {
+        // A Run that stops at a checkpoint ended on that leg's last trail, so its reward can be taken.
+        let at = p.pos;
+        if (this.path[at] && this.path[at].type === "CP" && at - 1 > start && this.path[at - 1].type === "T") at = at - 1;
+        await this.claim(p, line, at);
+      }
+      p.runBonus = 0; p.costMod = 0; p.keptEvents = []; p.campedLast = false;
+      for (const x of line) {
+        if (!p.dogs.includes(x.dog)) continue;
+        if (x.st === "rested") { if (x.dog.ab !== "tireless") x.dog.state = "tired"; }
+        else if (x.st === "tired") x.dog.state = "exh";
+      }
+      if (line.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
+        const opts = p.used.filter(g => g.name !== "Sled Basket").map(g => g.id);
+        if (opts.length) {
+          const id = await this.ask(p, { type: "tinker", options: opts });
+          const g = p.used.find(x => x.id === id) || p.used.find(x => opts.includes(x.id));
+          p.used.splice(p.used.indexOf(g), 1); p.gear.push(g);
+          this.log(`Tinker fixes up ${g.name}: back in hand.`, "good");
+        }
+      }
+      this.upd();
+      // Scout looks ahead once the Run has flipped what it flips, so the peek is a trail still face down
+      if (!p.scratched && line[0] && line[0].st === "rested" && line[0].dog.ab === "scout") {
+        const ids = this.nextFaceDown(p, 1);
+        if (ids.length) { this.log(`${p.name}'s Scout looks at the trail ahead.`, ""); await this.tell(p, { type: "peek", trails: ids, source: "Scout" }); }
+      }
+      for (const src of runEvents) { if (p.scratched) break; await this.event(p, src); }
+      if (pushed.length && !p.scratched) {
+        if (gearSel.some(g => g.name === "Booties")) {
+          this.log(`Booties protect the pushed dogs. No Event.`, "good");
+        } else {
+          const k = this.finalLeg(p.pos) && !this.rules.noPushPerDog ? pushed.length : 1;
+          for (let i = 0; i < k && !p.scratched; i++) await this.event(p, "pushing tired dogs");
+        }
+      }
+    }
+
+    async vetCheck(p, pos, line = []) {
+      if (!this.rules.vetCheck || this.path[pos].type !== "CP" || this.path[pos].cp !== 2) return;
+      // dogs that ran tired this turn are already exhausted after the run, so check exhausted + pushed dogs
+      const out = p.dogs.filter(d => d.state === "exh" || line.some(x => x.dog === d && x.st === "tired"));
+      for (const d of out) { p.dogs.splice(p.dogs.indexOf(d), 1); d.state = "removed"; p.lost.push(d); this.stats.removed++; }
+      if (out.length) this.log(`Vet check at Checkpoint 2: ${out.map(d => d.name).join(", ")} ${out.length > 1 ? "are" : "is"} too worn out and head${out.length > 1 ? "" : "s"} home.`, "bad");
+      else this.log(`Vet check at Checkpoint 2: ${p.name}'s team passes.`, "good");
+      if (!p.dogs.length) { p.scratched = true; this.log(`${p.name} has no dogs left and is scratched.`, "bad"); }
+      this.upd();
+      await this.tell(p, { type: "vetCheck", cards: out, scratched: p.scratched });
+    }
+    async doSlog(p, action) {
+      const nxt = p.pos + 1;
+      const leg = this.legOf(nxt);
+      p.slogLegs.add(leg);
+      p.pos = nxt;
+      this.onMoveOnto(nxt);
+      if (this.path[nxt].type === "T" && nxt + 1 < this.path.length && this.path[nxt + 1].type === "CP") {
+        p.pos = nxt + 1;
+        this.onMoveOnto(nxt + 1);
+        await this.vetCheck(p, nxt + 1);
+        if (p.scratched) return;
+      }
+      this.log(`${p.name} slogs to ${this.label(p.pos)}.`, "act");
+      this.upd();
+      if (p.musher === "Veteran" && !p.after) { this.log(`The Veteran knows the trail. No Event.`, "good"); return; }
+      const lantern = action.lantern && p.gear.find(g => g.name === "Red Lantern");
+      if (lantern) {
+        p.gear.splice(p.gear.indexOf(lantern), 1); p.used.push(lantern);
+        this.log(`The Red Lantern lights the way. No Event.`, "good");
+        return;
+      }
+      await this.event(p, "slogging");
+    }
+
+    shadowSafe(p) { return p.shadowTurn || p.dogs.some(d => d.ab === "shadow" && d.state === "rested"); }
+    refreshDogs(p) { p.dogs.forEach(d => { if (d.state !== "rested") d.state = "rested"; }); }
+
+    async doCampOpen(p, action) {
+      p.campedLast = true;
+      const here = p.pos >= 0 ? this.path[p.pos] : null;
+      this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
+      if (p.musher === "Trapper" && p.after) await this.drawDogs(p, 1, 1, "Trapper");
+      let safe = null;
+      if (here && here.type === "T" && here.name === "Spruce Forest") safe = "The Spruce Forest shelters the team.";
+      else if (p.musher === "Night Runner" && p.after) safe = "The Night Runner camps safely.";
+      else if (action.bivy) {
+        const b = p.gear.find(g => g.name === "Bivy Sack");
+        if (b) { p.gear.splice(p.gear.indexOf(b), 1); p.used.push(b); safe = "The Bivy Sack keeps everyone warm."; }
+      }
+      if (safe) this.log(`${safe} No Event.`, "good");
+      else {
+        const cocoa = p.dogs.some(d => d.ab === "cocoa" && d.state === "rested");
+        await this.event(p, "camping in the open", { choose2: cocoa });
+      }
+      if (!p.scratched) this.refreshDogs(p);
+      this.upd();
+    }
+
+    async drawGearKeep(p, draw, source) {
+      const drawn = [];
+      for (let i = 0; i < draw && this.gearDeck.length; i++) drawn.push(this.gearDeck.pop());
+      if (!drawn.length) return;
+      let keep = drawn[0];
+      if (drawn.length > 1) {
+        const id = await this.ask(p, { type: "keepGear", options: drawn.map(g => g.id), cards: drawn, source });
+        keep = drawn.find(g => g.id === id) || drawn[0];
+      }
+      p.gear.push(keep);
+      for (const g of drawn) if (g !== keep) this.gearDeck.splice(Math.floor(this.r() * (this.gearDeck.length + 1)), 0, g);
+      this.log(`${p.name} keeps ${p.bot ? "a gear" : keep.name} (${source}).`, "good");
+    }
+    // What a checkpoint camp gives: [dogs drawn, dogs kept, gear drawn (keep 1)]
+    cpGains(cp, long) {
+      if (this.mode === "lean") return long ? [2, 1, 2] : [1, 1, 1];
+      return long ? [3, 2, 2] : [2, 2, 1];
+    }
+    async doCampCP(p, long) {
+      const cp = this.path[p.pos].cp;
+      p.camped.add(cp);
+      p.campedLast = true;
+      this.refreshDogs(p);
+      const trapExtra = p.musher === "Trapper" && !p.after ? 3 : 0;
+      const [dd, dk, gd] = this.cpGains(cp, long);
+      const src = long ? "Long Rest" : "Checkpoint camp";
+      if (long) {
+        p.gear.push(...p.used); p.used = [];
+        this.log(`${p.name} takes the Long Rest at Checkpoint ${cp}.`, "act");
+      } else this.log(`${p.name} camps at Checkpoint ${cp}.`, "act");
+      await this.drawDogs(p, dd + trapExtra, dk, src);
+      if (gd > 1) await this.drawGearKeep(p, gd, src);
+      else this.takeGear(p, src);
+      if (long) {
+        p.longRested = true;
+        p.skip += 1;
+        p.flipAfterSkip = true;
+      }
+      this.upd();
+    }
+
+    // ---------- main loop ----------
+    async turn(p) {
+      p.turns++;
+      p.ignoreLeft = 0; p.shadowTurn = false;
+      if (p.skip > 0) {
+        p.skip--;
+        if (p.flipAfterSkip && p.skip === 0) {
+          p.after = true; p.flipAfterSkip = false;
+          this.log(`${p.name} wakes from the Long Rest. The ${p.musher} flips to the After side.`, "act");
+        } else this.log(`${p.name} skips this turn.`, "");
+        this.upd();
+        return;
+      }
+      if (this.io.turnStart) await this.io.turnStart(p);
+      if (!this.rules.noStorm && p.pos >= 0 && this.path[p.pos].type === "T" && this.finalLeg(p.pos)) {
+        const k = this.rules.stormScale ? Math.max(1, Math.ceil(p.dogs.length / this.rules.stormScale)) : 1;
+        for (let i = 0; i < k && !p.scratched; i++) await this.event(p, "the storm");
+        if (p.scratched) return;
+      }
+      let action;
+      for (let guard = 0; guard < 20; guard++) {
+        action = p.bot ? Bot.action(this, p) : await this.io.ask(p, { type: "action" });
+        if (action.type === "gear") { await this.useFreeGear(p, action.gear, action.target); continue; }
+        break;
+      }
+      const L = this.legal(p);
+      if (action.type === "slog" && !L.canSlog) action = { type: "camp" };
+      if (action.type === "run") {
+        const line = action.line.map(x => ({ dog: p.dogs.find(d => d.id === x.id) })).filter(x => x.dog).map(x => ({ dog: x.dog, st: x.dog.state }));
+        const gs = (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean);
+        const pv = this.preview(p, line, gs);
+        if (!line.length || line.some(x => x.st === "exh") || pv.crossed === 0) action = { type: "camp" };
+      }
+      if (action.type === "cp" && !L.atOpenCP) action = { type: "camp" };
+      if (L.mustLongRest && action.type !== "cp" && action.type !== "slog" && action.type !== "camp") action = { type: "cp", long: true };
+      if (L.mustLongRest && (action.type === "slog" || action.type === "camp")) action = { type: "cp", long: true };
+      if (p.pos >= this.cpIdx[1] && action.type !== "cp") { p.finalTurns = (p.finalTurns || 0) + 1; if (p.dogsAtCP2 == null) p.dogsAtCP2 = p.dogs.length; }
+      if (action.type === "run") await this.doRun(p, action);
+      else if (action.type === "slog") await this.doSlog(p, action);
+      else if (action.type === "cp") await this.doCampCP(p, !!action.long);
+      else await this.doCampOpen(p, action);
+      if (this.over || p.scratched) return;
+      const here = p.pos >= 0 ? this.path[p.pos] : null;
+      if (here && here.type === "T" && here.name === "Exposed Ridge" && !this.shadowSafe(p)) await this.event(p, "Exposed Ridge");
+      if (this.rules.handLimit && !p.scratched) await this.enforceHand(p);
+    }
+    async enforceHand(p) {
+      const H = this.rules.handLimit;
+      while (this.rested(p).length + p.gear.length > H) {
+        const opts = [...this.rested(p).map(d => d.id), ...p.gear.map(g => g.id)];
+        const id = await this.ask(p, { type: "discardHand", options: opts, limit: H });
+        const d = p.dogs.find(x => x.id === id && x.state === "rested");
+        if (d) { p.dogs.splice(p.dogs.indexOf(d), 1); this.dogDeck.unshift(d); d.state = "rested"; this.log(`${p.name} leaves ${d.name} at the kennel (hand limit).`, "bad"); }
+        else { const g = p.gear.find(x => x.id === id) || p.gear[0]; p.gear.splice(p.gear.indexOf(g), 1); this.gearDeck.unshift(g); this.log(`${p.name} leaves ${g.name} behind (hand limit).`, "bad"); }
+      }
+    }
+
+    async play() {
+      while (!this.over) {
+        this.round++;
+        this.log(`Round ${this.round}`, "round");
+        for (let i = 0; i < this.players.length && !this.over; i++) {
+          const p = this.players[i];
+          if (p.scratched) continue;
+          this.turnIdx = i;
+          this.current = p;
+          this.upd();
+          await this.turn(p);
+          this.upd();
+          if (this.io.afterTurn) await this.io.afterTurn(p);
+          if (this.players.every(q => q.scratched)) {
+            this.over = true;
+            this.log(`Every musher is scratched. The trail wins.`, "win");
+          }
+        }
+        if (this.round > 60) { this.over = true; this.log("The race is called after 60 rounds.", "sys"); }
+      }
+      this.current = null;
+      this.upd();
+      return this.winner;
+    }
+  }
+
+  // ---------------- Bots ----------------
+  const GEAR_RANK = ["Hot Broth", "Dog Food", "Sled Basket", "Booties", "Snack", "Bivy Sack", "Snow Hook", "Whistle",
+    "Wax the Runners", "Golden Harness", "Red Lantern", "Headlamp"];
+  const dogVal = d => d.rs + 0.5 * d.ts + (d.ab ? 0.5 : 0);
+
+  const Bot = {
+    arrange(dogs) { // dogs: [{dog, st}] -> best order
+      const r = dogs.filter(x => x.st === "rested"), t = dogs.filter(x => x.st === "tired");
+      const leads = r.filter(x => x.dog.role === "Lead");
+      const n = dogs.length;
+      const lv = x => (x.dog.ab === "comet" ? 2 : x.dog.ab === "flighty" && n < 3 ? 0 : 1) + (x.dog.ab === "birch" && n >= 2 ? 2 : 0);
+      leads.sort((a, b) => lv(b) - lv(a));
+      const first = leads[0] || null;
+      const yukon = r.find(x => x.dog.ab === "lastonly") || null;
+      let rest = dogs.filter(x => x !== first && x !== yukon);
+      const wheels = rest.filter(x => x.st === "rested" && x.dog.role === "Wheel");
+      const last = yukon || wheels[0] || null;
+      rest = rest.filter(x => x !== last);
+      const mitts = rest.find(x => x.st === "rested" && x.dog.ab === "mitts");
+      const echo = rest.filter(x => x.st === "rested" && x.dog.ab === "echo");
+      let mid = rest.filter(x => x !== mitts && !echo.includes(x));
+      const out = [];
+      if (first) out.push(first);
+      if (mitts && first) out.push(mitts); else if (mitts) mid.unshift(mitts);
+      out.push(...mid.filter(x => x.dog.role === "Team"), ...mid.filter(x => x.dog.role !== "Team"), ...echo);
+      if (last) out.push(last);
+      return out;
+    },
+    est(g, p, line, gear = []) {
+      if (!line.length) return 0;
+      const pv = g.preview(p, Bot.arrange(line), gear, { known: false, stopAtNewCP: true });
+      return pv.crossed + (pv.finished ? 5 : 0);
+    },
+    bestGear(g, p, line) {
+      let sel = [], best = Bot.est(g, p, line, sel);
+      const cands = p.gear.filter(x => x.when === "run" && x.name !== "Booties");
+      for (const c of cands) {
+        if (sel.some(s => s.name === c.name) && c.name !== "Snack") continue;
+        const v = Bot.est(g, p, line, [...sel, c]);
+        if (v > best) { best = v; sel = [...sel, c]; }
+      }
+      if (line.some(x => x.st === "tired")) {
+        const b = p.gear.find(x => x.name === "Booties");
+        if (b) sel.push(b);
+      }
+      return { sel, best };
+    },
+    action(g, p) {
+      const L = g.legal(p);
+      if (L.atOpenCP) {
+        if (L.mustLongRest) return { type: "cp", long: true };
+        if (!p.longRested && (p.musher === "Rookie" || p.musher === "Champion" || (p.musher !== "Sprinter" && p.dogs.length < 4))) return { type: "cp", long: true };
+        return { type: "cp", long: false };
+      }
+      // free recovery gear
+      if (!g.rested(p).length) {
+        for (const nm of ["Hot Broth", "Whistle", "Dog Food"]) {
+          const gg = p.gear.find(x => x.name === nm);
+          if (!gg) continue;
+          if (nm === "Dog Food" && g.exh(p).length) {
+            const d = g.exh(p).sort((a, b) => b.rs - a.rs)[0];
+            return { type: "gear", gear: gg.id, target: d.id };
+          }
+          if (nm !== "Dog Food" && g.tired(p).length) {
+            const d = g.tired(p).sort((a, b) => b.rs - a.rs)[0];
+            return { type: "gear", gear: gg.id, target: d.id };
+          }
+        }
+      }
+      let rested = g.rested(p).map(d => ({ dog: d, st: "rested" }));
+      if (g.rules.lineMax && rested.length > g.rules.lineMax) {
+        rested.sort((a, b) => (b.dog.rs + (b.dog.role !== "Team" ? 1 : 0)) - (a.dog.rs + (a.dog.role !== "Team" ? 1 : 0)));
+        rested = rested.slice(0, g.rules.lineMax);
+      }
+      const tank = rested.find(x => x.dog.ab === "heavy");
+      if (tank && rested.length > 1) {
+        const without = rested.filter(x => x !== tank);
+        if (Bot.est(g, p, without) > Bot.est(g, p, rested)) rested = without;
+      }
+      const tired = g.tired(p).map(d => ({ dog: d, st: "tired" })).sort((a, b) => b.dog.ts - a.dog.ts);
+      const base = Bot.est(g, p, rested);
+      let best = { v: base, line: rested };
+      for (let k = 1; k <= tired.length && (!g.rules.lineMax || rested.length + k <= g.rules.lineMax); k++) {
+        const cand = rested.concat(tired.slice(0, k));
+        const v = Bot.est(g, p, cand);
+        if (v > best.v && (p.dogs.length >= 3 || v >= 5)) best = { v, line: cand };
+      }
+      let { sel, best: withGear } = Bot.bestGear(g, p, best.line);
+      if (best.v < 1 && withGear < 1) {
+        // maybe gear makes the all-in run possible
+        const all = g.rules.lineMax ? rested.concat(tired).slice(0, g.rules.lineMax) : rested.concat(tired);
+        const gg = Bot.bestGear(g, p, all);
+        if (gg.best >= 1 && p.dogs.length >= 3) { best = { v: gg.best, line: all }; sel = gg.sel; withGear = gg.best; }
+      }
+      if (Math.max(best.v, withGear) >= 1) {
+        const ordered = Bot.arrange(best.line);
+        const realPv = g.preview(p, ordered, withGear > best.v ? sel : sel.filter(s => s.name === "Booties"));
+        if (realPv.crossed >= 1)
+          return { type: "run", line: ordered.map(x => ({ id: x.dog.id })), gear: (withGear > best.v ? sel : sel.filter(s => s.name === "Booties")).map(s => s.id) };
+      }
+      const lantern = !!p.gear.find(x => x.name === "Red Lantern");
+      const nxt = p.pos + 1;
+      if (L.canSlog && nxt + 1 < g.path.length && g.path[nxt].type === "T" && g.path[nxt + 1].type === "CP" && !p.camped.has(g.path[nxt + 1].cp))
+        return { type: "slog", lantern };
+      const allRested = p.dogs.map(d => ({ dog: d, st: "rested" }));
+      if (Bot.est(g, p, allRested) >= 1 || !L.canSlog) return { type: "camp", bivy: !!p.gear.find(x => x.name === "Bivy Sack") };
+      return { type: "slog", lantern };
+    },
+    answer(g, p, req) {
+      const byId = id => p.dogs.find(d => d.id === id) || g.dogDeck.find(d => d.id === id);
+      switch (req.type) {
+        case "pickEvent": return HARSH[req.options[0]] <= HARSH[req.options[1]] ? 0 : 1;
+        case "rookieIgnore": return HARSH[req.card] >= 4;
+        case "removeDog": return req.options.map(byId).sort((a, b) => (a.rs + a.ts) - (b.rs + b.ts))[0].id;
+        case "exhaustDog": return req.options.map(byId).sort((a, b) => a.ts - b.ts)[0].id;
+        case "keepDogs": {
+          const ds = req.cards.slice().sort((a, b) => dogVal(b) - dogVal(a));
+          return ds.slice(0, req.keep).map(d => d.id);
+        }
+        case "keepGear": return req.cards.slice().sort((a, b) => GEAR_RANK.indexOf(a.name) - GEAR_RANK.indexOf(b.name))[0].id;
+        case "lostBootie": return p.gear.slice().sort((a, b) => GEAR_RANK.indexOf(b.name) - GEAR_RANK.indexOf(a.name))[0].id;
+        case "sledBasket": return true;
+        case "discardHand": {
+          const ds = g.rested(p), gs = p.gear;
+          if (gs.length > 2 || !ds.length) return gs.slice().sort((a, b) => GEAR_RANK.indexOf(b.name) - GEAR_RANK.indexOf(a.name))[0].id;
+          return ds.slice().sort((a, b) => dogVal(a) - dogVal(b))[0].id;
+        }
+        case "stopAtCP": {
+          const here = g.path[p.pos];
+          return p.camped.has(here.cp); // keep going only if we already camped here
+        }
+        case "tinker": return p.used.filter(x => req.options.includes(x.id)).sort((a, b) => GEAR_RANK.indexOf(a.name) - GEAR_RANK.indexOf(b.name))[0].id;
+        default: return null;
+      }
+    },
+  };
+  return { Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
+})();
+
+
+</script>
+<script>
+(() => {
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const COLORS = ["var(--p0)", "var(--p1)", "var(--p2)", "var(--p3)"];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("lt:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("lt:" + k, JSON.stringify(v)); } catch {} },
+};
+
+// ---------------- Card art ----------------
+const norm = s => String(s).toLowerCase().replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9]/g, "");
+const dupStrip = k => k.replace(/copy\d*$/, "").replace(/\d$/, "");
+const ART = { files: new Map(), source: "", count: 0 }; // normalized basename -> url
+function setArt(entries, source) {
+  for (const u of ART.files.values()) if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+  ART.files = new Map(); ART.source = source;
+  const terrains = Object.keys(LT.TERRAIN).map(norm);
+  const backs = [];
+  for (const [name, url] of entries) {
+    const parts = name.split("/");
+    const k = norm(parts.pop());
+    if (!k) continue;
+    if (parts.some(s => /back/i.test(s))) { backs.push([k, url]); continue; }
+    if (!ART.files.has(k)) ART.files.set(k, url);
+  }
+  // Backs exported into their own folder: a trail's back becomes the face-down trail image
+  for (const [k, url] of backs) {
+    if (terrains.some(t => k.startsWith(t)) && !ART.files.has("trailback")) ART.files.set("trailback", url);
+    if (!ART.files.has("back" + k)) ART.files.set("back" + k, url);
+  }
+  ART.count = ART.files.size;
+  ART.cache = new Map();
+}
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1] ? d[i - 2][j - 2] + 1 : 99);
+  return d[a.length][b.length];
+}
+function artFor(keys) {
+  if (!ART.count) return null;
+  const ck = keys.join("|");
+  if (ART.cache.has(ck)) return ART.cache.get(ck);
+  let found = null;
+  for (const k of keys.map(norm)) { if (ART.files.has(k)) { found = ART.files.get(k); break; } }
+  if (!found) {
+    for (const k of keys.map(norm)) {
+      if (k.length < 3) continue;
+      let best = null;
+      for (const [fk, url] of ART.files) {
+        const m = fk.match(/^(.*?)(copy\d*|\d{1,2})$/);
+        const stripped = m ? m[1] : fk;
+        if (stripped === k || (k.length >= 5 && (stripped.endsWith(k) || fk.endsWith(k)))) { if (!best || fk.length < best[0].length || (fk.length === best[0].length && fk < best[0])) best = [fk, url]; }
+      }
+      if (best) { found = best[1]; break; }
+    }
+  }
+  if (!found) {
+    // forgive small typos (up to 2 letters off) when one file is clearly closest
+    for (const k of keys.map(norm)) {
+      if (k.length < 6) continue;
+      let best = null, tie = false;
+      for (const [fk, url] of ART.files) {
+        const m = fk.match(/^(.*?)(\d{1,2})$/);
+        for (const cand of m ? [fk, m[1]] : [fk]) {
+          if (Math.abs(cand.length - k.length) > 2) continue;
+          const dist = lev(cand, k);
+          if (dist > 2) continue;
+          if (!best || dist < best[0]) { best = [dist, url, fk]; tie = false; }
+          else if (dist === best[0] && best[2] !== fk && norm(best[2]).replace(/\d+$/, "") !== cand) tie = true;
+        }
+      }
+      if (best && !tie) { found = best[1]; break; }
+    }
+  }
+  ART.cache.set(ck, found);
+  return found;
+}
+const ALIAS = { "Wax the Runners": ["wax", "waxrunners"], "Moose on the Trail": ["moose", "mooseonthetrail"], "Squirrel!": ["squirrel"], "Sore Paws": ["paws"],
+  "Golden Harness": ["harness"], "Red Lantern": ["lantern"], "Northern Lights": ["aurora borealis"] };
+const artKeys = {
+  dog: d => [d.name, "dog " + d.name, d.name + " dog"],
+  gear: g => [g.name, "gear " + g.name, ...(ALIAS[g.name] || [])],
+  event: e => [e, "event " + e, ...(ALIAS[e] || [])],
+  musher: m => [m, "musher " + m, "the " + m],
+  trail: t => [`${t.name} ${t.cost} ${t.rtype || ""}`, `${t.name} ${t.cost} ${t.rtype || "none"}`, `${t.name} ${t.cost} ${t.rtype || "no reward"}`, `${t.name} ${t.cost} ${t.rtype ? "" : "blank"}`],
+  cp: n => [`checkpoint ${n}`, n === 2 ? "checkpoint 2 long rest" : "checkpoint 1", "checkpoint"],
+  finish: () => ["finish"],
+  back: kind => [`${kind} back`, `${kind}back`, `back ${kind}`, kind + "s back", "card back", "back"],
+};
+async function loadManifest() {
+  try {
+    const r = await fetch("art/manifest.json", { cache: "no-store" });
+    if (!r.ok) return false;
+    const list = await r.json();
+    const enc = f => "art/" + encodeURIComponent(f).replace(/%2F/g, "/");
+    if (Array.isArray(list) && list.length) setArt(list.map(f => [f, enc(f)]), "the game's built-in art");
+    else if (list && typeof list === "object" && Object.keys(list).length) setArt(Object.entries(list).map(([name, file]) => [name, enc(file)]), "the game's built-in art");
+    else return false;
+    return true;
+  } catch { return false; }
+}
+// IndexedDB cache for a folder the viewer picked
+const IDB = {
+  open() { return new Promise((res, rej) => { try { const r = indexedDB.open("longtrail-art", 1); r.onupgradeneeded = () => r.result.createObjectStore("files"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }); },
+  async save(files) { try { const db = await this.open(); const tx = db.transaction("files", "readwrite"); const st = tx.objectStore("files"); st.clear(); for (const [name, blob] of files) st.put(blob, name); await new Promise(r => { tx.oncomplete = r; tx.onerror = r; }); } catch {} },
+  async load() { try { const db = await this.open(); const tx = db.transaction("files", "readonly"); const st = tx.objectStore("files"); const keys = await new Promise(r => { const q = st.getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = () => r([]); }); const vals = await new Promise(r => { const q = st.getAll(); q.onsuccess = () => r(q.result); q.onerror = () => r([]); }); return keys.map((k, i) => [k, vals[i]]); } catch { return []; } },
+  async clear() { try { const db = await this.open(); const tx = db.transaction("files", "readwrite"); tx.objectStore("files").clear(); } catch {} },
+};
+function useFiles(fileList, remember) {
+  const imgs = [...fileList].filter(f => /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name));
+  if (!imgs.length) return 0;
+  imgs.sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name));
+  setArt(imgs.map(f => [f.webkitRelativePath || f.name, URL.createObjectURL(f)]), "your folder");
+  if (remember) IDB.save(imgs.map(f => [f.webkitRelativePath || f.name, new Blob([f], { type: f.type })]));
+  return imgs.length;
+}
+async function restoreFiles() {
+  const rows = await IDB.load();
+  if (!rows.length) return false;
+  setArt(rows.map(([n, b]) => [n, URL.createObjectURL(b)]), "your folder (saved in this browser)");
+  return true;
+}
+
+// ---------------- Card rendering ----------------
+const zb = (o, spec) => o.pick ? `<button class="zoomb" data-act="zoom" data-z="${esc(spec)}" aria-label="Enlarge card" title="Enlarge">⤢</button>` : "";
+const img = url => url ? `<img class="art" src="${esc(url)}" alt="" draggable="false">` : "";
+function dogCard(d, o = {}) {
+  const st = o.state || d.state;
+  const url = o.noArt ? null : artFor(artKeys.dog(d));
+  const cls = ["card", "dog", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : "", st === "tired" ? (url ? "tired-art" : "tired-txt") : ""].join(" ");
+  const attrs = o.attrs || "";
+  let inner;
+  if (url) inner = img(url) + (o.flag ? `<span class="stateflag">${esc(o.flag)}</span>` : "");
+  else inner = `<div class="band ${d.role}"></div><div class="ct">${esc(d.name)}</div><div class="cs">${d.role}</div>
+    <div class="cx">${esc(d.text)}</div>
+    <div class="dogspeed"><span class="big">${st === "tired" ? d.ts : d.rs}</span><span class="tiredv">${st === "tired" ? "tired · rested " + d.rs : "tired " + d.ts}</span></div>
+    ${o.flag ? `<span class="stateflag top">${esc(o.flag)}</span>` : ""}`;
+  const order = (o.order ? `<span class="order">${o.order}</span>` : "") + zb(o, `dog|${d.name}|${st}`);
+  const card = `<div class="${cls}" ${attrs} data-zoom="${esc(`dog|${d.name}|${st}`)}" title="${esc(d.name + " — " + d.role + " " + d.rs + "/" + d.ts + (d.text ? ". " + d.text : ""))}">${inner}${order}</div>`;
+  return st === "exh" && !o.flat ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
+}
+function gearCard(g, o = {}) {
+  const url = artFor(artKeys.gear(g));
+  const cls = ["card", "gear", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : ""].join(" ");
+  const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(g.name)}</div><div class="cs">Gear</div><div class="cx">${esc(g.text)}</div>`;
+  const card = `<div class="${cls}" ${o.attrs || ""} data-zoom="${esc("gear|" + g.name)}" title="${esc(g.name + ": " + g.text)}">${inner}${o.flag ? `<span class="stateflag">${esc(o.flag)}</span>` : ""}${zb(o, "gear|" + g.name)}</div>`;
+  return o.used ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
+}
+function eventCard(e, o = {}) {
+  const url = artFor(artKeys.event(e));
+  const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(e)}</div><div class="cs">Event</div><div class="cx">${esc(LT.EVENT_TEXT[e])}</div>`;
+  return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + LT.EVENT_TEXT[e])}">${inner}${zb(o, "event|" + e)}</div>`;
+}
+function musherCard(p, o = {}) {
+  const url = artFor(artKeys.musher(p.musher));
+  const t = LT.MUSHERS[p.musher];
+  const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(p.musher)}</div><div class="cs">${p.after ? "After Long Rest" : "Before Long Rest"}</div><div class="cx">${esc(t[p.after ? 1 : 0])}</div>`;
+  return `<div class="card musher" data-zoom="${esc("musher|" + p.musher + "|" + (p.after ? 1 : 0))}" title="${esc(p.musher)}">${url && p.after ? inner.replace('class="art"', 'class="art" style="transform:rotate(180deg)"') : inner}</div>`;
+}
+function backCard(kind, o = {}) {
+  const url = artFor(artKeys.back(kind));
+  return `<div class="card back ${o.cls || ""}">${url ? img(url) : `<span class="bt">LONG<br>TRAIL</span>`}</div>`;
+}
+function trailCard(c, i, o = {}) {
+  if (c.type === "CP") {
+    const url = artFor(artKeys.cp(c.cp));
+    return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Cost 0</div><div class="cx">${esc(LT.CP_TEXT)}</div>`}</div>`;
+  }
+  if (c.type === "F") {
+    const url = artFor(artKeys.finish());
+    return `<div class="card finish" data-zoom="finish" title="Finish">${url ? img(url) : `<div class="band"></div><div class="ct">Finish</div><div class="cs">Cost ${LT.FINISH_COST}</div><div class="cx">${esc(LT.FINISH_TEXT)}</div>`}</div>`;
+  }
+  if (!c.up && !o.reveal) return backCard("trail").replace('class="card back', 'data-zoom="back" class="card back');
+  const url = artFor(artKeys.trail(c));
+  const inner = url ? img(url) : `<div class="band"></div><span class="tc">${c.cost}</span><div class="ct" style="padding-right:2em">${esc(c.name)}</div><div class="cs">Trail</div><div class="cx">${esc(LT.TERRAIN[c.name])}</div>${c.rtype ? `<span class="rew">${c.rtype === "dog" ? "Dog" : "Gear"} reward</span>` : `<span class="rew" style="opacity:.35">No reward</span>`}`;
+  return `<div class="card trail" data-zoom="${esc(`trail|${c.name}|${c.cost}|${c.rtype || ""}`)}" title="${esc(c.name + " · cost " + c.cost + " · " + (LT.TERRAIN[c.name] || "No terrain rule"))}">${inner}</div>`;
+}
+
+// ---------------- App state ----------------
+const S = {
+  screen: "setup",
+  seats: store.get("seats", [
+    { name: "Aaron", bot: false, musher: "Random" },
+    { name: "Bot Kit", bot: true, musher: "Random" },
+    { name: "Bot Juno", bot: true, musher: "Random" },
+  ]),
+  botSpeed: store.get("botSpeed", 700),
+  cardSize: store.get("cardSize", "M"),
+  mode: store.get("mode", "standard"),
+  rules: store.get("rules", {}),
+  legs: store.get("legs", [2, 3, 5]),
+  game: null,
+  pending: null,      // {p, req, resolve}
+  run: null,          // run builder {line:[ids], gear:Set}
+  viewer: null,       // human whose hand is shown
+  lastPassed: null,
+  freshFrom: 0,
+  lastAct: {},
+  overlay: null,      // local modal (free gear target etc.)
+  showLog: true,
+};
+const humans = () => S.game ? S.game.players.filter(p => !p.bot) : [];
+
+// ---------------- Game IO ----------------
+function makeIO() {
+  const io = {
+    G: null,
+    live() { return S.game && S.game === io.G; },
+    log(line) {
+      if (!io.live()) return;
+      const g = S.game;
+      if (g.current && line.cls !== "round") S.lastAct[g.current.idx] = line.msg;
+      renderLog();
+    },
+    update() { if (io.live() && S.screen === "game") renderGame(); },
+    ask(p, req) {
+      if (!io.live()) return new Promise(() => {});
+      return new Promise(resolve => {
+        S.pending = { p, req, resolve };
+        if (req.type === "action") S.run = null;
+        renderGame();
+      });
+    },
+    async turnStart(p) {
+      if (!io.live()) return new Promise(() => {});
+      await T.waitRunning();
+      if (p.bot) {
+        T.turnBegin();
+        if (S.botSpeed > 0) { renderGame(); await sleep(S.botSpeed * 0.6); }
+        return;
+      }
+      if (humans().length > 1 && S.viewer !== p) {
+        S.viewer = null;
+        await new Promise(res => { S.overlay = { type: "pass", p, res }; renderGame(); });
+      }
+      T.turnBegin();
+      S.viewer = p;
+      renderGame();
+    },
+    async afterTurn(p) {
+      if (!io.live()) return new Promise(() => {});
+      if (p.bot && S.botSpeed > 0) await sleep(S.botSpeed);
+      T.turnEnd(p);
+      await T.waitRunning();
+    },
+  };
+  return io;
+}
+// ---------------- Race timer ----------------
+const T = {
+  reset(n) { this.start = Date.now(); this.pausedTotal = 0; this.pausedAt = null; this.end = null; this.per = Array(n).fill(0); this.turns = Array(n).fill(0); this.ts = null; },
+  active() { if (this.start == null) return 0; if (this.end != null) return this.end; return (this.pausedAt || Date.now()) - this.start - this.pausedTotal; },
+  pause() { if (this.pausedAt == null && this.end == null) this.pausedAt = Date.now(); },
+  resume() { if (this.pausedAt != null) { this.pausedTotal += Date.now() - this.pausedAt; this.pausedAt = null; (this.waiters || []).splice(0).forEach(f => f()); } },
+  waitRunning() { return this.pausedAt == null ? Promise.resolve() : new Promise(r => (this.waiters = this.waiters || []).push(r)); },
+  stop() { if (this.end == null) this.end = this.active(); },
+  turnBegin() { this.ts = this.active(); },
+  turnEnd(p) { if (this.ts == null) return; this.per[p.idx] += this.active() - this.ts; this.turns[p.idx]++; this.ts = null; },
+};
+const fmt = ms => { const s = Math.floor(ms / 1000); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0"); };
+function tickClock() {
+  const el = $("#clock"); if (!el) return;
+  el.textContent = fmt(T.active());
+  const b = $("#pausebtn"); if (b) b.textContent = T.pausedAt != null ? "Resume" : "Pause";
+}
+setInterval(tickClock, 500);
+
+function resolvePending(v) {
+  const pd = S.pending;
+  if (!pd) return;
+  S.pending = null;
+  S.run = null;
+  pd.resolve(v);
+}
+
+async function startGame(seed) {
+  const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i] }));
+  store.set("seats", S.seats);
+  const io = makeIO();
+  S.game = new LT.Game({ players: seats, io, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice() });
+  io.G = S.game;
+  S.screen = "game"; S.pending = null; S.run = null; S.overlay = null; S.lastAct = {};
+  T.reset(seats.length);
+  const hs = humans();
+  S.viewer = hs.length === 1 ? hs[0] : null;
+  render();
+  const g = S.game;
+  try { await g.play(); } catch (e) { console.error(e); g.log("Something went wrong: " + e.message, "sys"); }
+  if (S.game === g) { T.stop(); tickClock(); S.overlay = { type: "over" }; renderGame(); }
+}
+
+// ---------------- Rendering ----------------
+const app = $("#app");
+function render() { if (S.screen === "setup") renderSetup(); else renderGame(true); }
+
+function renderSetup() {
+  const seats = S.seats.map((s, i) => `
+    <div class="seat">
+      <span class="dot" style="background:${COLORS[i]}"></span>
+      <input data-k="name" data-i="${i}" value="${esc(s.name)}" aria-label="Seat ${i + 1} name" maxlength="18">
+      <span class="seg" role="group" aria-label="Seat ${i + 1} control">
+        <button data-act="ctl" data-i="${i}" data-v="h" class="${!s.bot ? "on" : ""}">Human</button><button data-act="ctl" data-i="${i}" data-v="b" class="${s.bot ? "on" : ""}">Bot</button>
+      </span>
+      <select data-k="musher" data-i="${i}" aria-label="Seat ${i + 1} musher">
+        ${["Random", ...LT.MUSHER_NAMES].map(m => `<option ${m === s.musher ? "selected" : ""}>${m}</option>`).join("")}
+      </select>
+      <button class="ghost rm" data-act="rmseat" data-i="${i}" ${S.seats.length <= 2 ? "disabled" : ""} aria-label="Remove seat">✕</button>
+    </div>`).join("");
+  app.innerHTML = `
+  <div class="setup">
+    <div class="hero">
+      <div class="label">Playtest table · v9 rules</div>
+      <h1>Long <span style="color:var(--accent)">Trail</span></h1>
+      <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
+    </div>
+    <div class="panel">
+      <div class="label">Seats, in turn order</div>
+      ${seats}
+      <div class="row" style="margin-top:10px"><button data-act="addseat" ${S.seats.length >= 4 ? "disabled" : ""}>+ Add a seat</button>
+      <span class="small" style="align-self:center">Later seats start with extra gear: +1, +2, +3.</span></div>
+    </div>
+    <div class="panel">
+      <div class="label">Trail layout</div>
+      <div class="legs">
+        ${["Before Checkpoint 1", "Between the checkpoints", "Final leg"].map((t, i) => `<label><span>${t}</span><select data-leg="${i}">${[1, 2, 3, 4, 5, 6].map(v => `<option ${S.legs[i] == v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}
+        <span class="small legtotal">${S.legs.reduce((a, b) => a + b, 0)} trails · standard is 2-3-5 <button class="ghost" data-act="legreset" style="padding:2px 8px;font-size:12px">Reset</button></span>
+      </div>
+      <div class="label" style="margin-top:14px">Checkpoint rules</div>
+      <div class="modes">
+        <label><input type="radio" name="mode" value="standard" ${S.mode !== "lean" ? "checked" : ""}> <span><b>Standard</b><small>Normal camp: draw 2 dogs and the top gear. Long Rest: draw 3 dogs keep 2, draw 2 gear keep 1.</small></span></label>
+        <label><input type="radio" name="mode" value="lean" ${S.mode === "lean" ? "checked" : ""}> <span><b>Lean checkpoints</b><small>Normal camp: take 1 dog and the top gear. Long Rest: draw 2 dogs keep 1, draw 2 gear keep 1. Long Rest still returns used gear, skips a turn and flips your musher.</small></span></label>
+      </div>
+      <div class="label" style="margin-top:14px">Final-leg weather</div>
+      <div class="modes">
+        <label><input type="checkbox" id="rule-storm" ${!S.rules.noStorm ? "checked" : ""}> <span><b>Storm</b><small>At the start of each of your turns, if you are on a final-leg trail, draw an Event.</small></span></label>
+        <label><input type="checkbox" id="rule-harsh" ${!S.rules.noHarsh ? "checked" : ""}> <span><b>Harsh weather</b><small>On the final leg, any Event that removes a dog removes 2 instead.</small></span></label>
+        <label><input type="checkbox" id="rule-push" ${!S.rules.noPushPerDog ? "checked" : ""}> <span><b>No easy pushing</b><small>On the final leg, draw one Event for each tired dog you push (instead of one per Run).</small></span></label>
+      </div>
+      <div class="label" style="margin-top:14px">Test rules for a tougher final stretch</div>
+      <div class="modes">
+        <label><span style="flex:none"><select id="rule-line"><option value="0" ${!S.rules.lineMax ? "selected" : ""}>No limit</option><option value="7" ${S.rules.lineMax == 7 ? "selected" : ""}>7 dogs</option><option value="6" ${S.rules.lineMax == 6 ? "selected" : ""}>6 dogs</option><option value="5" ${S.rules.lineMax == 5 ? "selected" : ""}>5 dogs</option></select></span><span><b>Gangline limit</b><small>The most dogs you can run in one line.</small></span></label>
+        <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is sent home.</small></span></label>
+        <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
+      </div>
+      <div class="opts" style="margin-top:12px">
+        <label>Bot speed <select id="botspeed">
+          ${[[1400, "Slow"], [700, "Normal"], [250, "Fast"], [0, "Instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}
+        </select></label>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="label">Card art</div>
+      <p class="artstat">${ART.count ? `Using card art from ${esc(ART.source)}.` : "No card art loaded. Cards show as text until you add art."}</p>
+      <div class="row">
+        <label class="primary" style="display:inline-flex"><input type="file" id="artpick" webkitdirectory multiple accept="image/*" hidden><span class="btnlike">Choose art folder…</span></label>
+        <label style="display:inline-flex"><input type="file" id="artpick2" multiple accept="image/*" hidden><span class="btnlike2">Choose image files…</span></label>
+        ${ART.count && ART.source.startsWith("your") ? `<button data-act="clearart">Use built-in art instead</button>` : ""}
+        ${ART.count ? `<button data-act="artcheck">Check matches</button>` : ""}
+      </div>
+      <p class="small">Pick your Dextrous PNG export folder (the one holding <i>fronts</i>, so trail backs come along too) or just the <i>fronts</i> folder. Files named like <i>willow.png</i>, <i>bittercold2.png</i>, <i>sledbasket1.png</i> or <i>snowfield6gear.png</i> are matched automatically. Your images stay in this browser and are never uploaded.</p>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="primary" data-act="start" style="font-size:17px;padding:10px 22px">Start the race</button></div>
+  </div>`;
+  app.querySelectorAll(".btnlike, .btnlike2").forEach(el => {
+    Object.assign(el.style, { padding: "7px 12px", borderRadius: "8px", border: "1px solid var(--line)", cursor: "pointer", background: el.classList.contains("btnlike") ? "var(--accent)" : "var(--panel)", color: el.classList.contains("btnlike") ? "var(--accent-fg)" : "var(--fg)", fontWeight: el.classList.contains("btnlike") ? 700 : 400 });
+  });
+}
+
+function playerChips(p) {
+  const g = S.game;
+  const chips = [];
+  chips.push(`<span class="chip">${esc(g.label(p.pos))}</span>`);
+  chips.push(`<span class="chip">${g.rested(p).length} in hand</span>`);
+  if (g.tired(p).length) chips.push(`<span class="chip">${g.tired(p).length} tired</span>`);
+  if (g.exh(p).length) chips.push(`<span class="chip warn">${g.exh(p).length} exhausted</span>`);
+  chips.push(`<span class="chip">${p.gear.length} gear${p.used.length ? ` · ${p.used.length} used` : ""}</span>`);
+  if (p.longRested) chips.push(`<span class="chip ok">Long Rest done</span>`);
+  if (p.skip) chips.push(`<span class="chip warn">skips next turn</span>`);
+  if (p.keptEvents.length) chips.push(`<span class="chip">${p.keptEvents.map(esc).join(", ")}</span>`);
+  if (p.lost.length) chips.push(`<span class="chip warn">lost ${p.lost.length}</span>`);
+  if (p.scratched) chips.push(`<span class="chip warn">scratched</span>`);
+  return chips.join("");
+}
+
+function renderGame(full) {
+  const g = S.game; if (!g) return;
+  if (full || !$("#strip")) {
+    app.innerHTML = `
+      <div class="top">
+        <h1>Long <span>Trail</span></h1>
+        <div class="meta" id="meta"></div>
+        <div class="tools">
+          <span class="clock" title="Race time (paused time doesn't count)">⏱ <b id="clock">0:00</b></span>
+          <button id="pausebtn" data-act="pause">Pause</button>
+          <select id="botspeed2" aria-label="Bot speed">${[[1400, "Bots: slow"], [700, "Bots: normal"], [250, "Bots: fast"], [0, "Bots: instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <span class="seg sizer" role="group" aria-label="Card size">${["S", "M", "L"].map(v => `<button data-act="size" data-v="${v}" class="${(S.cardSize || "M") === v ? "on" : ""}" title="Card size ${v}">${v}</button>`).join("")}</span>
+          <button data-act="rules">Rules</button>
+          <button data-act="newrace">New race</button>
+        </div>
+      </div>
+      <div class="stripbox"><div class="strip" id="strip"></div></div>
+      <div class="players" id="players"></div>
+      <div class="main"><div class="board" id="board"></div><div class="rail"><div class="runpanel" id="runpanel"></div></div></div>
+      <details class="logbox" id="logwrap" ${store.get("logOpen", true) ? "open" : ""}><summary><span class="label">Race log</span><span class="small" id="loglast"></span></summary><div class="log" id="log"></div></details>
+      <div id="modal"></div>`;
+    renderLog(true);
+  }
+  const cur = g.current;
+  $("#meta").innerHTML = `${g.legs.join("-") !== "2-3-5" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "lean" ? `<span class="chip">Lean checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${g.rules.noHarsh ? `<span class="chip">No harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax ? `<span class="chip">Gangline ${g.rules.lineMax}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
+  renderStrip();
+  $("#players").innerHTML = g.players.map(p => `
+    <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
+      <div class="nm"><b>${esc(p.name)}</b><span class="small">${esc(p.musher)} · ${p.after ? "after" : "before"} · ${p.bot ? "bot" : "human"}</span></div>
+      <div class="chips">${playerChips(p)}</div>
+      ${S.lastAct[p.idx] ? `<div class="last">${esc(S.lastAct[p.idx])}</div>` : ""}
+    </div>`).join("");
+  renderBoard();
+  renderModal();
+}
+
+function projection() {
+  const g = S.game, pd = S.pending;
+  if (!S.run || !pd) return null;
+  const p = pd.p;
+  const line = S.run.line.map(id => p.dogs.find(d => d.id === id)).filter(Boolean).map(d => ({ dog: d, st: d.state }));
+  const gear = [...S.run.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
+  if (!line.length) return { line, gear, pv: null };
+  const pv = g.preview(p, line, gear, { stopAtHidden: true });
+  return { line, gear, pv };
+}
+
+function renderStrip() {
+  const g = S.game;
+  const pr = projection();
+  const projSet = new Set(pr && pr.pv ? pr.pv.steps.map(s => s.pos) : []);
+  const end = pr && pr.pv && pr.pv.crossed ? pr.pv.end : null;
+  const tok = pos => g.players.filter(p => p.pos === pos && !p.scratched).map(p => `<span class="tok" style="background:${p.color}" title="${esc(p.name)} (${esc(p.musher)})">${esc(p.name[0].toUpperCase())}</span>`).join("");
+  let html = `<div class="slot"><div class="tokens">${tok(-1)}</div><div class="startcard">Start</div><div class="slotlab">Start</div></div>`;
+  g.path.forEach((c, i) => {
+    let lab = c.type === "CP" ? `Checkpoint ${c.cp}` : c.type === "F" ? "Finish" : `Trail ${g.trailNo(i)}${g.finalLeg(i) ? " · final" : ""}`;
+    const rw = c.type === "T" && c.reward ? (c.reward.kind === "dog" ? dogCard(c.reward.card, { w: 60 }).replace('class="card', 'class="card rewmini') : gearCard(c.reward.card).replace('class="card', 'class="card rewmini')) : "";
+    html += `<div class="slot ${projSet.has(i) ? (i === end ? "projend" : "proj") : ""}"><div class="tokens">${tok(i)}</div>${trailCard(c, i)}<div class="slotlab">${lab}</div>${rw}</div>`;
+  });
+  $("#strip").innerHTML = html;
+}
+
+function canUseFree(p, g, gr) {
+  if (gr.name === "Dog Food") return g.exh(p).length > 0;
+  if (gr.name === "Whistle") return g.tired(p).length > 0;
+  if (gr.name === "Hot Broth") return g.tired(p).length > 0;
+  if (gr.name === "Headlamp") return g.nextFaceDown(p, 1).length > 0;
+  return false;
+}
+
+function boardPlayer() {
+  const g = S.game, pd = S.pending;
+  const myTurn = !!(pd && pd.req.type === "action" && !pd.p.bot);
+  const p = myTurn ? pd.p : S.viewer;
+  if (!p || (humans().length > 1 && !(g.current === p && !p.bot) && !myTurn)) return { p: null, myTurn };
+  return { p, myTurn };
+}
+
+function renderBoard() {
+  const g = S.game, el = $("#board"), rp = $("#runpanel");
+  const { p, myTurn } = boardPlayer();
+  if (!p) {
+    const cur = g.current;
+    el.innerHTML = `<div class="waiting">${g.over ? "The race is over." : cur ? `<b style="color:${cur.color}">${esc(cur.name)}</b> is on the trail…` : "…"}</div>`;
+    rp.innerHTML = `<div class="waiting" style="padding:8px">${g.over ? "Race over." : "Waiting for the next musher."}</div>`;
+    return;
+  }
+  const rested = g.rested(p), tired = g.tired(p), exh = g.exh(p);
+  const run = myTurn ? S.run : null;
+  const inLine = id => !!(run && run.line.includes(id));
+  const full = !!(run && g.rules.lineMax && run.line.length >= g.rules.lineMax);
+  const pickable = d => run && !full && d.state !== "exh" && !inLine(d.id);
+
+  // ---- in front of you (public)
+  const tz = [];
+  if (tired.length) tz.push(`<div class="tz"><div class="label">Tired · ${tired.length}</div><div class="row">${tired.map(d => dogCard(d, { pick: pickable(d), dim: inLine(d.id), attrs: pickable(d) ? `data-act="adddog" data-id="${d.id}"` : "", flag: inLine(d.id) ? "in line" : null })).join("")}</div></div>`);
+  if (exh.length) tz.push(`<div class="tz"><div class="label">Exhausted · ${exh.length}</div><div class="row">${exh.map(d => dogCard(d, {})).join("")}</div></div>`);
+  if (p.used.length) tz.push(`<div class="tz"><div class="label">Used gear · back at your Long Rest</div><div class="row">${p.used.map(gr => gearCard(gr, { used: true })).join("")}</div></div>`);
+  if (p.keptEvents.length) tz.push(`<div class="tz"><div class="label">Kept Events · next Run</div><div class="row">${p.keptEvents.map(e => eventCard(e)).join("")}</div></div>`);
+
+  // ---- the hand (private): dogs, then gear
+  const items = [];
+  rested.forEach(d => items.push({ kind: "dog", html: dogCard(d, { pick: pickable(d), attrs: pickable(d) ? `data-act="adddog" data-id="${d.id}"` : "" }), inline: inLine(d.id) }));
+  p.gear.forEach((gr, j) => {
+    const runG = !!(run && gr.when === "run");
+    const free = myTurn && !run && gr.when === "free" && canUseFree(p, g, gr);
+    items.push({ kind: "gear", gap: j === 0 && rested.length > 0, inline: false,
+      html: gearCard(gr, { pick: runG, sel: !!(run && run.gear.has(gr.id)), attrs: runG ? `data-act="togglegear" data-id="${gr.id}"` : "" })
+        + (free ? `<button class="usebtn" data-act="usegear" data-id="${gr.id}">Use</button>` : "") });
+  });
+  const n = items.length;
+  const step = Math.min(4, 20 / Math.max(n, 1));
+  const maxDy = Math.pow((n - 1) / 2, 2) * step * 0.9;
+  const hand = items.map((it, i) => {
+    const o = i - (n - 1) / 2;
+    return `<div class="hc ${it.inline ? "inline" : ""} ${it.gap ? "gap" : ""}" style="--rot:${(o * step).toFixed(2)}deg;--dy:${(o * o * step * 0.9).toFixed(1)}px;--z:${i + 1}">${it.html}</div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="musherrow">
+      ${musherCard(p)}
+      <div class="mtext">
+        <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
+        <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · heading home: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
+        <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(LT.MUSHERS[p.musher][0])}</div>
+        <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(LT.MUSHERS[p.musher][1])}</div>
+      </div>
+    </div>
+    <div class="tableau" aria-label="In front of you">${tz.join("") || `<span class="empty">Nothing in front of you. Every dog is rested.</span>`}</div>
+    <div class="handzone">
+      <div class="label">Your hand · ${rested.length} dog${rested.length === 1 ? "" : "s"}, ${p.gear.length} gear${run ? " · tap dogs to add them to your line" : " · tap a card to look closer"}</div>
+      <div class="hand" id="hand" data-maxrot="${((n - 1) / 2 * step).toFixed(2)}" style="padding-bottom:${Math.round(maxDy + 14)}px">${hand || `<span class="empty">Your hand is empty.</span>`}</div>
+    </div>`;
+  fitHand();
+
+  if (myTurn) rp.innerHTML = run ? runPanelHTML(p) : actionsHTML(p);
+  else rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`;
+}
+
+function fitHand() {
+  const h = $("#hand"); if (!h) return;
+  const cards = h.querySelectorAll(".hc");
+  if (cards.length < 2) return;
+  const w = cards[0].getBoundingClientRect().width / Math.max(.5, Math.cos(0)) || 120;
+  const cw = cards[0].offsetWidth || w;
+  const maxRot = (+h.dataset.maxrot || 0) * Math.PI / 180;
+  const swing = Math.sin(maxRot) * (cards[0].offsetHeight || cw * 1.4) * 1.3; // rotated edge cards lean outward
+  const avail = h.clientWidth - 24 - 2 * swing;
+  const natural = cw * 0.72; // a little overlap even when there's room, so it reads as a hand
+  const per = Math.min(natural, (avail - cw - (h.querySelector(".hc.gap") ? 16 : 0)) / (cards.length - 1));
+  h.style.setProperty("--ov", `${(per - cw).toFixed(1)}px`);
+}
+window.addEventListener("resize", () => { if (S.screen === "game") fitHand(); });
+
+function actionsHTML(p) {
+  const g = S.game, L = g.legal(p);
+  const here = p.pos >= 0 ? g.path[p.pos] : null;
+  const allDogs = [...g.rested(p), ...g.tired(p)].map(d => ({ dog: d, st: d.state }));
+  const runGear = p.gear.filter(x => x.when === "run");
+  const noTank = allDogs.filter(x => !(x.st === "rested" && x.dog.ab === "heavy"));
+  const anyRun = [allDogs, noTank].some(ds => ds.length && g.preview(p, LT.Bot.arrange(ds), runGear, { stopAtHidden: true }).crossed >= 1);
+  const lantern = p.gear.find(x => x.name === "Red Lantern");
+  const bivy = p.gear.find(x => x.name === "Bivy Sack");
+  const safeCamp = (here && here.type === "T" && here.name === "Spruce Forest") || (p.musher === "Night Runner" && p.after);
+  const vetSafe = p.musher === "Veteran" && !p.after;
+  let slogWhy = "";
+  if (!L.canSlog) slogWhy = L.slogUsed ? "Already slogged this leg." : !L.canPass ? "Take your Long Rest first." : "You can't slog onto the Finish.";
+  const btn = (act, title, sub, opts = {}) => `<button class="act ${opts.primary ? "primary" : ""}" data-act="${act}" ${opts.disabled ? "disabled" : ""}><b>${title}</b><span>${sub}</span></button>`;
+  let h = `<h3>Your turn</h3><div class="small">${esc(g.label(p.pos))}</div><div class="acts">`;
+  if (L.atOpenCP) {
+    const gainTxt = (cp, long) => { const [dd, dk, gd] = g.cpGains(cp, long); const t = p.musher === "Trapper" && !p.after ? 3 : 0;
+      const dogs = dd + t === dk ? `take ${dk} dog${dk > 1 ? "s" : ""}` : `draw ${dd + t} dogs keep ${dk}`;
+      return `${dogs[0].toUpperCase() + dogs.slice(1)}, ${gd > 1 ? `draw ${gd} gear keep 1` : "take the top gear"}.`; };
+    h += btn("cpcamp", "Normal camp", `Dogs back to hand. ${gainTxt(L.cp, false)} No Event.`, { primary: !L.mustLongRest, disabled: L.mustLongRest });
+    h += btn("longrest", "Long Rest", `Dogs and used gear back. ${gainTxt(L.cp, true)} Skip your next turn, then flip your musher.`, { primary: true, disabled: p.longRested });
+  }
+  if (!L.mustLongRest) {
+    h += btn("run", "Run…", anyRun && L.canPass ? "Line up your dogs and move." : "Your team can't cover the next trail right now.", { primary: !L.atOpenCP, disabled: !(anyRun && L.canPass) });
+    h += btn("slog", "Slog", L.canSlog ? `Move 1 trail without dogs.${vetSafe ? " No Event (Veteran)." : lantern ? " Red Lantern can skip the Event." : " Draw an Event."} Once per leg.` : slogWhy, { disabled: !L.canSlog });
+    if (lantern && L.canSlog && !vetSafe) h += `<label><input type="checkbox" id="uselantern" checked> Use Red Lantern on this Slog</label>`;
+    if (!L.atOpenCP) {
+      h += btn("camp", "Camp", safeCamp ? "Dogs back to hand. No Event here." : "Draw an Event, then dogs back to hand.");
+      if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy" checked> Use Bivy Sack (no Event)</label>`;
+    }
+  }
+  h += `</div>`;
+  const notes = [];
+  if (L.mustLongRest) notes.push("You must take your Long Rest here before passing Checkpoint 2.");
+  if (here && here.type === "T" && g.finalLeg(p.pos)) {
+    const fl = [];
+    if (!g.rules.noHarsh) fl.push("Events that remove a dog remove 2");
+    if (!g.rules.noPushPerDog) fl.push("each tired dog you push draws an Event");
+    if (fl.length) notes.push(`Final leg: ${fl.join(", and ")}.`);
+  }
+  const free = p.gear.filter(gr => gr.when === "free" && canUseFree(p, g, gr));
+  const seen = new Set();
+  const freeBtns = free.filter(gr => !seen.has(gr.name) && seen.add(gr.name)).map(gr => `<button class="act" data-act="usegear" data-id="${gr.id}"><b>Use ${esc(gr.name)}</b><span>${esc(gr.text)}</span></button>`).join("");
+  return h + (freeBtns ? `<div class="label" style="margin-top:12px">Gear you can use first</div><div class="acts" style="margin-top:6px">${freeBtns}</div>` : "") + (notes.length ? `<div class="notes">${notes.map(esc).join(" ")}</div>` : "");
+}
+
+// Reasons a trail costs this musher something other than its printed number.
+function costWhy(g, p, i, line, gear) {
+  const c = g.path[i], r = [];
+  if (!c || c.type !== "T") return r;
+  const ahead = g.players.filter(q => q !== p && !q.scratched && q.pos >= i);
+  if (ahead.length) r.push(`−${c.name === "Deep Powder" ? 3 : 1} drafting (${ahead.map(q => esc(q.name)).join(", ")} ahead)`);
+  else if (p.musher === "Trailbreaker") r.push(`−${p.after ? 1 : 2} Trailbreaker (nobody's been here)`);
+  const wheels = line.filter(x => x.st === "rested" && x.dog.role === "Wheel");
+  if (c.name === "Mountain Pass" && wheels.length) r.push(`−${wheels.reduce((s2, x) => s2 + x.dog.rs, 0)} rested Wheel dogs (${wheels.map(x => esc(x.dog.name)).join(", ")})`);
+  if (line.some(x => x.st === "rested" && x.dog.ab === "nanook") && (c.name === "Spruce Forest" || c.name === "Exposed Ridge")) r.push("−1 Nanook");
+  if (p.musher === "Veteran" && p.after && g.finalLeg(i)) r.push("−1 Veteran");
+  if (p.costMod) r.push(`+${p.costMod} Fresh Snow`);
+  if (gear.some(x => x.name === "Wax the Runners")) r.push("−1 Wax the Runners");
+  if (gear.some(x => x.name === "Snow Hook") && (c.name === "Mountain Pass" || c.name === "Deep Powder")) r.push("−2 Snow Hook");
+  return r;
+}
+
+// What the next trail costs this musher, and how much of that the dogs must cover.
+function targetInfo(g, p, line, gear) {
+  let i = p.pos + 1;
+  if (p.pos >= 0 && g.path[p.pos].type === "CP" && !g.canPassCP(p, p.pos)) return null;
+  if (i >= g.path.length) return null;
+  if (g.path[i].type === "CP") i++;
+  const c = g.path[i];
+  const cost = g.trailCost(p, i, line, gear);
+  const printed = c.type === "F" ? LT.FINISH_COST : c.cost;
+  const reasons = costWhy(g, p, i, line, gear);
+  if (cost === 1 && printed > 1 && reasons.length) reasons.push("can't go below 1");
+  const sp = g.speedOf(p, line, gear);
+  const dogSet = new Set(line.map(x => x.dog.name));
+  const extra = sp.parts.filter(([w]) => !dogSet.has(w) && !/\(tired\)$/.test(w) && w !== "Lead bonus" && w !== "Wheel bonus");
+  const extraSum = extra.reduce((s2, x) => s2 + x[1], 0);
+  return { i, name: c.type === "F" ? "the Finish" : `${esc(c.name)} (trail ${g.trailNo(i)})`, cost, printed, reasons, extra,
+    need: Math.max(0, cost - extraSum), dogSpeed: sp.total - extraSum };
+}
+
+function runPanelHTML(p) {
+  const g = S.game;
+  const pr = projection();
+  const run = S.run;
+  const lineDogs = run.line.map(id => p.dogs.find(d => d.id === id)).filter(Boolean);
+  const n = lineDogs.length;
+  const yukonBad = lineDogs.some((d, i) => d.ab === "lastonly" && d.state === "rested" && i !== n - 1);
+  // per-dog Speed (first n parts are the dogs, in order)
+  const per = pr && pr.pv ? pr.pv.parts.slice(0, n).map(x => x[1]) : [];
+  const lb = pr && pr.pv ? (pr.pv.parts.find(x => x[0] === "Lead bonus") || [0, 0])[1] : 0;
+  const wb = pr && pr.pv ? (pr.pv.parts.find(x => x[0] === "Wheel bonus") || [0, 0])[1] : 0;
+
+  // zigzag: back dog bottom-left, each dog further forward sits in the other column, half a card higher
+  const W = innerWidth < 900 ? Math.max(90, Math.min(150, Math.floor((innerWidth - 136) / 2))) : 165, H = Math.round(W * 88 / 63), GAP = 8, SIDE = 34;
+  let line;
+  if (!n) line = `<div class="emptyline">Tap dogs in your hand, or tired dogs in front of you. The first dog you add runs at the front.</div>`;
+  else {
+    const height = (n - 1) * H / 2 + H;
+    const cards = lineDogs.map((d, i) => {
+      const k = n - 1 - i;                  // 0 = back of the line
+      const right = k % 2 === 1;
+      const left = right ? (SIDE + W + GAP) : 0;
+      const bottom = k * H / 2;
+      let bonus = per[i] != null ? per[i] : 0;
+      if (i === 0) bonus += lb;
+      if (i === n - 1) bonus += wb;
+      const role = i === 0 ? "front" : i === n - 1 ? "back" : "";
+      return `<div class="zz ${right ? "r" : "l"}" draggable="true" data-drag="${d.id}" style="left:${left}px;bottom:${bottom}px;z-index:${n - k}">
+          ${dogCard(d, { flat: true })}
+          <div class="zzctl">
+            <span class="zznum" title="Position in line">${i + 1}</span>
+            <span class="zzspd" title="Speed this dog adds${role ? ", including its " + (role === "front" ? "Lead" : "Wheel") + " bonus" : ""}">+${bonus}</span>
+            <button data-act="mv" data-id="${d.id}" data-d="-1" ${i === 0 ? "disabled" : ""} aria-label="Move toward the front" title="Toward the front">▲</button>
+            <button data-act="rmdog" data-id="${d.id}" aria-label="Take out of line" title="Take out">✕</button>
+            <button data-act="mv" data-id="${d.id}" data-d="1" ${i === n - 1 ? "disabled" : ""} aria-label="Move toward the back" title="Toward the back">▼</button>
+          </div>
+        </div>`;
+    }).join("");
+    line = `<div class="zzbox" style="--zw:${W}px;--side:${SIDE}px;width:${2 * (W + SIDE) + GAP}px;height:${height}px">${cards}</div>`;
+  }
+
+  // run gear
+  const runGear = p.gear.filter(x => x.when === "run");
+  const gearHTML = runGear.length ? `<div class="rungear"><div class="label">Gear for this Run</div><div class="gearpills">${runGear.map(gr => `<label class="${run.gear.has(gr.id) ? "on" : ""}" title="${esc(gr.text)}"><input type="checkbox" data-act="togglegear" data-id="${gr.id}" ${run.gear.has(gr.id) ? "checked" : ""}><span><b>${esc(gr.name)}</b> <small>${esc(gr.text)}</small></span></label>`).join("")}</div></div>` : "";
+
+  const ti = targetInfo(g, p, lineDogs.map(d => ({ dog: d, st: d.state })), [...run.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean));
+  let ok = false, after = "";
+  if (pr && pr.pv) {
+    const pv = pr.pv;
+    let where;
+    if (pv.finished) where = `<b>Reaches the Finish and wins!</b>`;
+    else if (pv.crossed) where = `Reaches <b>${esc(g.label(pv.end))}</b> with ${pv.left} Speed left${pv.hiddenNext ? " for the face-down trail ahead" : ""}.`;
+    else where = `<b style="color:var(--bad)">Can't pay for the next trail${pv.tankBlock ? " (Tank won't step onto River Ice)" : ""}.</b>`;
+    const pushed = pr.line.filter(x => x.st === "tired").length;
+    const booties = pr.gear.some(x => x.name === "Booties");
+    const perDog = g.finalLeg(pv.end) && !g.rules.noPushPerDog;
+    const evs = pushed ? (booties ? "Booties: no push Events." : `Pushing ${pushed} tired dog${pushed > 1 ? "s" : ""}: draw ${perDog ? pushed : 1} Event${perDog && pushed > 1 ? "s" : ""} after.`) : "No tired dogs, no push Event.";
+    const ri = pr.line.length >= 3 && pv.steps.some(s => g.path[s.pos].type === "T" && g.path[s.pos].name === "River Ice") && !g.shadowSafe(p) && !pr.line.some(x => x.st === "rested" && x.dog.ab === "shadow") ? " River Ice with 3+ dogs draws an Event." : "";
+    const later = pv.steps.filter(st => g.path[st.pos].type !== "CP").slice(1).map(st => {
+      const c = g.path[st.pos];
+      const label = c.type === "F" ? "Finish" : `${esc(c.name)}`;
+      const printed = c.type === "F" ? LT.FINISH_COST : c.cost;
+      const w = costWhy(g, p, st.pos, pr.line, pr.gear);
+      return `<span class="tchip" title="${esc(w.join(", "))}">then ${label} ${st.cost}${st.cost !== printed ? ` <s>${printed}</s>` : ""}</span>`;
+    }).join("");
+    const cp2 = g.cpIdx[1];
+    let vetWarn = "";
+    if (g.rules.vetCheck && p.pos < cp2 && pv.steps.some(s2 => s2.pos === cp2)) {
+      const goners = [...g.exh(p), ...pr.line.filter(x => x.st === "tired").map(x => x.dog)];
+      vetWarn = goners.length ? `<div class="warn">Vet check at Checkpoint 2 will send home: ${goners.map(d => esc(d.name)).join(", ")}.</div>` : `<div class="breakdown">Vet check at Checkpoint 2: your team would pass.</div>`;
+    }
+    after = `<div class="sumafter">
+        <div>Total Speed <b>${pv.speed}</b>. ${where}</div>
+        ${later ? `<div class="chips2">${later}</div>` : ""}
+        <div class="breakdown">${evs}${ri}</div>
+        ${vetWarn}${yukonBad ? `<div class="warn">Yukon must run last.</div>` : ""}
+      </div>`;
+    ok = pv.crossed >= 1 && !yukonBad;
+  }
+  let summary = "";
+  if (ti) {
+    const verdict = !n ? `<span class="small">Add dogs below</span>` : ti.dogSpeed >= ti.need ? `<span class="ok">✓ enough</span>` : `<span class="short">${ti.need - ti.dogSpeed} short</span>`;
+    const costChips = (ti.cost !== ti.printed || ti.reasons.length) ? `<span class="tchip">printed ${ti.printed}</span>${ti.reasons.map(r => `<span class="tchip">${r}</span>`).join("")}` : "";
+    const bonusChips = ti.extra.map(([w, v]) => `<span class="tchip plus">+${v} ${esc(w)}</span>`).join("");
+    summary = `<div class="summary">
+      <div class="label">Next trail · ${ti.name}</div>
+      <div class="vs">
+        <div class="col"><div class="k">Your dogs need</div><div class="big">${ti.need}</div>${ti.extra.length ? `<div class="small">trail costs ${ti.cost}</div>` : ""}</div>
+        <div class="col"><div class="k">Your dogs have</div><div class="big ${!n ? "" : ti.dogSpeed >= ti.need ? "ok" : "short"}">${n ? ti.dogSpeed : "–"}</div>${n && (lb || wb) ? `<div class="small">incl. ${[lb ? "Lead +" + lb : "", wb ? "Wheel +" + wb : ""].filter(Boolean).join(", ")}</div>` : ""}</div>
+        <div class="verdict">${verdict}</div>
+      </div>
+      ${costChips || bonusChips ? `<div class="chips2">${costChips}${bonusChips}</div>` : ""}
+      ${after}
+    </div>`;
+  } else if (after) summary = `<div class="summary">${after}</div>`;
+  const cap = g.rules.lineMax ? `<div class="small" style="text-align:center">${n} of ${g.rules.lineMax} gangline spots used</div>` : "";
+  return `<h3>Set up your Run</h3>
+    ${summary}
+    <div class="runbtns">
+      <button class="primary" data-act="go" ${ok ? "" : "disabled"}>Run!</button>
+      <button data-act="autoline">Suggest a line</button>
+      <button data-act="clearline" ${n ? "" : "disabled"}>Clear</button>
+      <button data-act="cancelrun">Back</button>
+    </div>
+    ${gearHTML}
+    ${cap}
+    <div class="lineend">Front of the line</div>
+    ${line}
+    <div class="lineend">Sled</div>`;
+}
+
+let logCount = 0;
+function renderLog(full) {
+  const g = S.game, el = $("#log"); if (!g || !el) return;
+  if (full) { el.innerHTML = ""; logCount = 0; }
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  el.querySelectorAll(".fresh").forEach(x => x.classList.remove("fresh"));
+  const frag = document.createDocumentFragment();
+  for (; logCount < g.logLines.length; logCount++) {
+    const l = g.logLines[logCount];
+    const d = document.createElement("div");
+    d.className = (l.cls || "") + (full ? "" : " fresh");
+    d.textContent = l.cls === "round" ? l.msg : l.msg;
+    frag.appendChild(d);
+  }
+  el.appendChild(frag);
+  const last = g.logLines[g.logLines.length - 1]; const ll = $("#loglast"); if (ll && last) ll.textContent = last.msg;
+  if (atBottom || full) el.scrollTop = el.scrollHeight;
+}
+
+// ---------------- Modals ----------------
+function modal(html) { $("#modal").innerHTML = `<div class="scrim"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`; }
+function renderModal() {
+  const m = $("#modal"); if (!m) return;
+  const g = S.game, ov = S.overlay, pd = S.pending;
+  if (ov) {
+    if (ov.type === "pass") return modal(`<div class="pass"><div class="label">Pass the screen</div><div class="who" style="color:${ov.p.color}">${esc(ov.p.name)}</div><p class="small">Everyone else, look away. ${esc(ov.p.name)} plays the ${esc(ov.p.musher)}.</p><button class="primary" data-act="passok">I'm ${esc(ov.p.name)}, show my hand</button></div>`);
+    if (ov.type === "over") {
+      const w = g.winner;
+      return modal(`<h3>${w ? `${esc(w.name)} wins the Long Trail!` : "The trail wins this time."}</h3>
+        <p class="small">${g.round} rounds · ${g.stats.events} Events drawn · ${g.stats.removed} dogs sent home.</p>
+        <p><b>Race time ${fmt(T.active())}</b> · about ${fmt(T.active() / Math.max(1, g.round))} per round.</p>
+        <table class="times"><thead><tr><th>Musher</th><th>Turns</th><th>Time on turns</th><th>Per turn</th></tr></thead><tbody>
+        ${g.players.map(p => `<tr><td><b style="color:${p.color}">${esc(p.name)}</b>${p.bot ? " (bot)" : ""}</td><td>${T.turns[p.idx]}</td><td>${fmt(T.per[p.idx])}</td><td>${T.turns[p.idx] ? fmt(T.per[p.idx] / T.turns[p.idx]) : "–"}</td></tr>`).join("")}
+        </tbody></table>
+        ${g.players.some(p => p.bot) ? `<p class="small">Bot turns count toward the race time at the bot speed you picked. For a table estimate, look at the human per-turn times.</p>` : ""}
+        <ul>${g.players.map(p => `<li><b style="color:${p.color}">${esc(p.name)}</b> (${esc(p.musher)}): ${p.scratched ? "scratched" : esc(g.label(p.pos))}, ${p.dogs.length} dogs left${p.lost.length ? `, lost ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</li>`).join("")}</ul>
+        <div class="btns"><button data-act="closeover">Look at the board</button><button data-act="newrace">New race</button><button class="primary" data-act="rematch">Rematch</button></div>`);
+    }
+    if (ov.type === "rules") return modal(rulesHTML());
+    if (ov.type === "paused") return modal(`<div class="pass"><div class="label">Race paused</div><div class="who">⏱ ${fmt(T.active())}</div><p class="small">The clock and the bots are stopped.</p><button class="primary" data-act="pause">Resume</button></div>`);
+    if (ov.type === "freepick") {
+      const p = ov.p;
+      return modal(`<h3>${esc(ov.gear.name)}</h3><p class="small">${esc(ov.gear.text)} Pick a dog.</p><div class="cards">${ov.options.map(d => dogCard(d, { pick: true, attrs: `data-act="freepickdog" data-id="${d.id}"`, state: "rested" })).join("")}</div><div class="btns"><button data-act="closeov">Cancel</button></div>`);
+    }
+    if (ov.type === "artcheck") return modal(ov.html);
+    if (ov.type === "zoom") return modal(zoomHTML(ov.spec) + `<div class="btns" style="margin-top:12px"><button class="primary" data-act="closezoom">Close</button></div>`);
+  }
+  if (!pd || pd.p.bot || pd.req.type === "action") { m.innerHTML = ""; return; }
+  const r = pd.req, p = pd.p;
+  const findDog = id => p.dogs.find(d => d.id === id) || (r.cards || []).find(d => d.id === id);
+  switch (r.type) {
+    case "event":
+      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3>
+        <div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>${r.ignored ? `<p class="small" style="color:var(--good)">${esc(r.ignored)}</p>` : ""}
+        ${g.finalLeg(p.pos) && !g.rules.noHarsh && /[Rr]emove/.test(LT.EVENT_TEXT[r.card]) && !r.ignored ? `<p class="small" style="color:var(--bad)">Harsh weather: this removes 2 dogs on the final leg.</p>` : ""}
+        <div class="btns"><button class="primary" data-act="ok">OK</button></div>`);
+    case "pickEvent":
+      return modal(`<div class="label">${esc(p.name)} · ${p.musher === "Gambler" ? "Gambler" : "Cocoa"} · Event from ${esc(r.source)}</div><h3>Choose one Event</h3>
+        <div class="cards">${r.options.map((e, i) => eventCard(e, { pick: true, attrs: `data-act="pick" data-v="${i}"` })).join("")}</div>`);
+    case "rookieIgnore":
+      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>
+        <p class="small">Rookie: once per leg you may ignore an Event.</p>
+        <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
+    case "removeDog": case "exhaustDog": {
+      const ids = r.all || r.options;
+      const stateName = d => d.state === "rested" ? "rested" : d.state === "tired" ? "tired" : "exhausted";
+      const cards = ids.map(findDog).filter(Boolean).sort((a, b) => (r.options.includes(b.id) ? 1 : 0) - (r.options.includes(a.id) ? 1 : 0))
+        .map(d => r.options.includes(d.id)
+          ? dogCard(d, { pick: true, flat: true, attrs: `data-act="pick" data-v="${d.id}"`, flag: stateName(d) })
+          : dogCard(d, { flat: true, dim: true, flag: stateName(d) })).join("");
+      const harsh = r.n > 1 ? ` (${r.k} of ${r.n}, harsh weather)` : "";
+      return modal(`<div class="label">${esc(p.name)} · ${esc(r.cause)}${harsh}</div><h3>${r.type === "removeDog" ? "Choose a dog to send home" : "Choose a tired dog to exhaust"}</h3>
+        <p class="small">${esc(r.reason || "")} Tap a bright card to choose it.${r.options.length === 1 ? " Only one dog can be chosen right now." : ""}</p>
+        <div class="cards">${cards}</div>`);
+    }
+    case "keepDogs": {
+      const sel = S.keepSel || (S.keepSel = new Set());
+      return modal(`<div class="label">${esc(p.name)} · ${esc(r.source)}</div><h3>Keep ${r.keep} of these dogs</h3>
+        <div class="cards">${r.cards.map(d => dogCard(d, { pick: true, sel: sel.has(d.id), attrs: `data-act="keeptoggle" data-id="${d.id}"`, state: "rested" })).join("")}</div>
+        <div class="btns"><span class="small" style="align-self:center">${sel.size} of ${r.keep} chosen</span><button class="primary" data-act="keepok" ${sel.size === r.keep ? "" : "disabled"}>Keep these</button></div>`);
+    }
+    case "keepGear":
+      return modal(`<div class="label">${esc(p.name)} · Long Rest</div><h3>Keep one gear</h3><div class="cards">${r.cards.map(c => gearCard(c, { pick: true, attrs: `data-act="pick" data-v="${c.id}"` })).join("")}</div>`);
+    case "lostBootie":
+      return modal(`<div class="label">${esc(p.name)} · Lost Bootie</div><h3>Choose a gear to lose</h3><div class="cards">${p.gear.map(c => gearCard(c, { pick: true, attrs: `data-act="pick" data-v="${c.id}"` })).join("")}</div>`);
+    case "tinker":
+      return modal(`<div class="label">${esc(p.name)} · Tinker</div><h3>Return one used gear to your hand</h3><div class="cards">${p.used.filter(c => r.options.includes(c.id)).map(c => gearCard(c, { pick: true, attrs: `data-act="pick" data-v="${c.id}"` })).join("")}</div>`);
+    case "sledBasket": {
+      const d = findDog(r.dog);
+      return modal(`<div class="label">${esc(p.name)} · ${esc(r.cause)}</div><h3>Use your Sled Basket?</h3><div class="cards">${dogCard(d, { flat: true })}</div>
+        <p>${esc(d.name)} would be removed. The Sled Basket makes it exhausted instead, then the Basket leaves the game.</p>
+        <div class="btns"><button data-act="pick" data-v="0">Let it go</button><button class="primary" data-act="pick" data-v="1">Use Sled Basket</button></div>`);
+    }
+    case "stopAtCP":
+      return modal(`<div class="label">${esc(p.name)} · Run</div><h3>You reach Checkpoint ${r.cp}</h3>
+        <p>You have <b>${r.left}</b> Speed left and the next trail costs <b>${r.nextCost}</b>. Stop here to camp at the checkpoint next turn, or keep running?</p>
+        <div class="btns"><button data-act="pick" data-v="0">Stop at Checkpoint ${r.cp}</button><button class="primary" data-act="pick" data-v="1">Keep going</button></div>`);
+    case "vetCheck":
+      return modal(`<div class="label">${esc(p.name)} · Checkpoint 2</div><h3>Vet check</h3>
+        ${r.cards.length ? `<p>The vet sends home every exhausted dog and every dog you pushed to get here.${r.scratched ? " <b>That was your whole team. You're scratched.</b>" : ""}</p>
+          <div class="cards">${r.cards.map(d => dogCard(d, { flat: true, flag: "heading home" })).join("")}</div>` : `<p>Every dog passes. Nobody is sent home.</p>`}
+        <div class="btns"><button class="primary" data-act="ok">OK</button></div>`);
+    case "peek":
+      return modal(`<div class="label">${esc(p.name)} · ${esc(r.source)} · only you see this</div><h3>${r.trails.length ? "The trail ahead" : "Nothing left to see"}</h3>
+        <div class="cards">${r.trails.map(i => `<div style="text-align:center">${trailCard(g.path[i], i, { reveal: true })}<div class="small">Trail ${g.trailNo(i)}</div></div>`).join("")}</div>
+        <div class="btns"><button class="primary" data-act="ok">Got it</button></div>`);
+  }
+  m.innerHTML = "";
+}
+
+function zoomHTML(spec) {
+  const [kind, a, b, c] = spec.split("|");
+  if (kind === "dog") {
+    const r = LT.DOGS.find(x => x[0] === a); if (!r) return "";
+    const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: r[5] };
+    return `<div class="zoomview">${dogCard(d, { state: "rested", flat: true })}<div class="zt"><div class="label">${d.role} dog${b && b !== "rested" ? " · " + (b === "exh" ? "exhausted" : b) : ""}</div><h3>${esc(d.name)}</h3>
+      <p>Rested Speed <b>${d.rs}</b> · Tired Speed <b>${d.ts}</b></p>${d.text ? `<p>${esc(d.text)}</p>` : `<p class="small">No ability.</p>`}
+      <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first, rested." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last, rested." : "Team: no position bonus."}</p></div></div>`;
+  }
+  if (kind === "gear") {
+    const r = LT.GEAR.find(x => x[0] === a); if (!r) return "";
+    return `<div class="zoomview">${gearCard({ name: r[0], text: r[3] })}<div class="zt"><div class="label">Gear · ${r[1]} in the deck</div><h3>${esc(r[0])}</h3><p>${esc(r[3])}</p></div></div>`;
+  }
+  if (kind === "event") {
+    const r = LT.EVENTS.find(x => x[0] === a); if (!r) return "";
+    return `<div class="zoomview">${eventCard(a)}<div class="zt"><div class="label">Event · ${r[1]} in the deck</div><h3>${esc(a)}</h3><p>${esc(r[2])}</p><p class="small">On the final leg, an Event that removes a dog removes 2.</p></div></div>`;
+  }
+  if (kind === "musher") {
+    const t = LT.MUSHERS[a];
+    return `<div class="zoomview">${musherCard({ musher: a, after: false })}<div class="zt"><div class="label">Musher</div><h3>${esc(a)}</h3>
+      <p class="${b === "1" ? "small" : ""}"><b>Before Long Rest.</b> ${esc(t[0])}</p><p class="${b === "1" ? "" : "small"}"><b>After Long Rest.</b> ${esc(t[1])}</p></div></div>`;
+  }
+  if (kind === "trail") {
+    const t = { name: a, cost: +b, rtype: c || null, up: true };
+    return `<div class="zoomview">${trailCard(t, 0, { reveal: true })}<div class="zt"><div class="label">Trail · cost ${b}</div><h3>${esc(a)}</h3><p>${esc(LT.TERRAIN[a] || "No terrain rule.")}</p>
+      <p class="small">${c ? (c === "dog" ? "Dog reward: end your Run here to take the dog." : "Gear reward: end your Run here to take the gear.") : "No reward."} Drafting: costs 1 less if another musher is on or past it${a === "Deep Powder" ? " (3 less here)" : ""}.</p></div></div>`;
+  }
+  if (kind === "cp") return `<div class="zoomview">${trailCard({ type: "CP", cp: +a }, 0)}<div class="zt"><div class="label">Checkpoint ${a} · cost 0</div><h3>Checkpoint</h3><p>${esc(LT.CP_TEXT)}</p><p class="small">Every musher takes exactly one Long Rest, at either checkpoint, and must take it before passing Checkpoint 2.</p></div></div>`;
+  if (kind === "finish") return `<div class="zoomview">${trailCard({ type: "F" }, 0)}<div class="zt"><div class="label">Cost ${LT.FINISH_COST}</div><h3>Finish</h3><p>${esc(LT.FINISH_TEXT)}</p></div></div>`;
+  if (kind === "back") return `<div class="zoomview">${backCard("trail")}<div class="zt"><h3>Face-down trail</h3><p>Flips when a musher moves onto the trail before it.</p></div></div>`;
+  return "";
+}
+
+function rulesHTML() {
+  return `<h3>Long Trail · quick rules</h3>
+  <details class="rules" open><summary>Your turn: Run, Slog or Camp</summary><ul>
+    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you). Rested dogs use full Speed, ability and role bonus; tired dogs only tired Speed. Lead first +1, Wheel last +1.</li>
+    <li>Pay each trail's cost to move onto it and keep going while you can. Drafting: a trail costs 1 less if another musher is on or past it.</li>
+    <li>After a Run, rested dogs that ran become tired, tired ones become exhausted. Ran any tired dogs? Draw 1 Event (final leg: 1 per tired dog).</li>
+    <li>If your Run ends on a trail with a reward, take it.</li>
+    <li><b>Slog:</b> move one trail with no dogs and draw an Event. Once per leg. No reward.</li>
+    <li><b>Camp:</b> draw an Event first, then all tired and exhausted dogs return to your hand. Used gear stays used.</li></ul></details>
+  <details class="rules"><summary>Checkpoints and the Long Rest</summary><ul>
+    <li>Checkpoints cost 0. Reaching the last trail of a leg puts you in the checkpoint; with Speed left you may stop or keep going.</li>
+    <li>Camp once per checkpoint, no Event. Normal camp: dogs back, draw 2 dogs, take the top gear.</li>
+    <li>Long Rest (exactly once, either checkpoint, required before passing Checkpoint 2): dogs and used gear back, draw 3 dogs keep 2, draw 2 gear keep 1, skip your next turn, then flip your musher.</li></ul></details>
+  <details class="rules"><summary>Final leg and Events</summary><ul>
+    <li>Storm: start your turn on a final-leg trail, draw an Event. Events that remove a dog remove 2. Each pushed tired dog draws an Event.</li>
+    <li>Removed dogs must be tired or exhausted if you have any. No dogs left: you're scratched.</li>
+    <li>Finish costs 2. First musher there wins.</li></ul></details>
+  <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
+}
+
+function artCheckHTML() {
+  const names = [];
+  LT.DOGS.forEach(d => names.push(["Dog", d[0], artFor(artKeys.dog({ name: d[0] }))]));
+  LT.GEAR.forEach(x => names.push(["Gear", x[0], artFor(artKeys.gear({ name: x[0] }))]));
+  LT.EVENTS.forEach(x => names.push(["Event", x[0], artFor(artKeys.event(x[0]))]));
+  LT.MUSHER_NAMES.forEach(x => names.push(["Musher", x, artFor(artKeys.musher(x))]));
+  LT.TRAILS.forEach(t => names.push(["Trail", `${t[0]} ${t[1]} ${t[2] || "none"}`, artFor(artKeys.trail({ name: t[0], cost: t[1], rtype: t[2] }))]));
+  names.push(["Other", "Checkpoint 1", artFor(artKeys.cp(1))], ["Other", "Checkpoint 2", artFor(artKeys.cp(2))], ["Other", "Finish", artFor(artKeys.finish())]);
+  const hit = names.filter(n => n[2]).length;
+  const miss = names.filter(n => !n[2]);
+  const used = new Set(names.map(n => n[2]).filter(Boolean));
+  const base = dupStrip;
+  const usedKeys = [...ART.files].filter(([, u]) => used.has(u)).map(([k]) => k);
+  const usedBases = new Set([...usedKeys, ...usedKeys.map(base)]);
+  const unused = [...ART.files].filter(([k, u]) => !used.has(u) && !/^back/.test(k) && k !== "trailback" && !usedBases.has(base(k))).map(([k]) => k);
+  return `<h3>Card art matches</h3><p>${hit} of ${names.length} card images found. Extra copies of the same card share one image.</p>
+    ${miss.length ? `<p class="small">No image found for: ${miss.map(n => `${n[0]} <b>${esc(n[1])}</b>`).join(", ")}.</p>` : ""}
+    ${unused.length ? `<p class="small">Images that didn't match any card (names shown without spaces or capitals): ${unused.map(k => `<b>${esc(k)}</b>`).join(", ")}. Renaming one of these to the card's name fixes the match.</p>` : ""}
+    <p class="small">Face-down trails ${artFor(artKeys.back("trail")) ? "use your trail back image." : "use the built-in striped back. If you design a card back later, put it in a folder with \"back\" in its name next to <i>fronts</i> and choose the parent folder."}</p>
+    <div class="btns"><button class="primary" data-act="closeov">Close</button></div>`;
+}
+
+function ensureModalHost() { if (!$("#modal")) app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); }
+const SIZES = { S: [120, 84], M: [150, 96], L: [190, 112] };
+function applySize() {
+  const [h, s] = SIZES[S.cardSize] || SIZES.M;
+  document.documentElement.style.setProperty("--handw", `min(${h}px, 40vw)`);
+  document.documentElement.style.setProperty("--stripw", `min(${s}px, 19vw)`);
+}
+
+// ---------------- Events ----------------
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.k) { S.seats[+t.dataset.i][t.dataset.k] = t.value; store.set("seats", S.seats); }
+});
+document.addEventListener("change", async e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.leg != null) { S.legs[+t.dataset.leg] = +t.value; store.set("legs", S.legs); renderSetup(); return; }
+  if (t.name === "mode") { S.mode = t.value; store.set("mode", S.mode); }
+  if (t.id === "rule-line") { S.rules.lineMax = +t.value || 0; if (!S.rules.lineMax) delete S.rules.lineMax; store.set("rules", S.rules); }
+  if (t.id === "rule-storm") { if (t.checked) delete S.rules.noStorm; else S.rules.noStorm = true; store.set("rules", S.rules); }
+  if (t.id === "rule-harsh") { if (t.checked) delete S.rules.noHarsh; else S.rules.noHarsh = true; store.set("rules", S.rules); }
+  if (t.id === "rule-push") { if (t.checked) delete S.rules.noPushPerDog; else S.rules.noPushPerDog = true; store.set("rules", S.rules); }
+  if (t.id === "rule-vet") { if (t.checked) S.rules.vetCheck = true; else delete S.rules.vetCheck; store.set("rules", S.rules); }
+  if (t.id === "rule-big") { if (t.checked) S.rules.bigLine = 5; else delete S.rules.bigLine; store.set("rules", S.rules); }
+  if (t.id === "botspeed" || t.id === "botspeed2") { S.botSpeed = +t.value; store.set("botSpeed", S.botSpeed); }
+  if (t.id === "artpick" || t.id === "artpick2") {
+    const n = useFiles(t.files, true);
+    renderSetup();
+    if (!n) { const s = $(".artstat"); if (s) s.textContent = "No images found in that selection."; }
+  }
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]");
+  if (!b) {
+    const z = e.target.closest("[data-zoom]");
+    if (z && !z.closest(".zoomview")) { S.overlay = { type: "zoom", spec: z.dataset.zoom, prev: S.overlay }; ensureModalHost(); renderModal(); return; }
+    if (e.target.classList && e.target.classList.contains("scrim") && S.overlay && S.overlay.type === "zoom") { S.overlay = S.overlay.prev || null; renderModal(); }
+    return;
+  }
+  if (b.disabled) return;
+  const act = b.dataset.act, g = S.game, pd = S.pending;
+  const id = b.dataset.id;
+  switch (act) {
+    // setup
+    case "ctl": S.seats[+b.dataset.i].bot = b.dataset.v === "b"; if (S.seats[+b.dataset.i].bot && !/^bot/i.test(S.seats[+b.dataset.i].name)) S.seats[+b.dataset.i].name = "Bot " + ["Kit", "Juno", "Moss", "Pike"][+b.dataset.i]; store.set("seats", S.seats); renderSetup(); break;
+    case "addseat": if (S.seats.length < 4) { const i = S.seats.length; S.seats.push({ name: "Bot " + ["Kit", "Juno", "Moss", "Pike"][i], bot: true, musher: "Random" }); store.set("seats", S.seats); renderSetup(); } break;
+    case "rmseat": if (S.seats.length > 2) { S.seats.splice(+b.dataset.i, 1); store.set("seats", S.seats); renderSetup(); } break;
+    case "start": startGame(); break;
+    case "legreset": S.legs = [2, 3, 5]; store.set("legs", S.legs); renderSetup(); break;
+    case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
+    case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
+    // game header
+    case "rules": S.overlay = { type: "rules" }; renderModal(); break;
+    case "newrace": S.game = null; S.pending = null; S.overlay = null; S.screen = "setup"; render(); break;
+    case "rematch": { S.overlay = null; startGame(); break; }
+    case "pause": if (S.game && !S.game.over) { if (T.pausedAt != null) { T.resume(); if (S.overlay && S.overlay.type === "paused") S.overlay = null; } else { T.pause(); S.overlay = { type: "paused" }; } tickClock(); renderModal(); } break;
+    case "closeover": S.overlay = null; renderModal(); break;
+    case "zoom": S.overlay = { type: "zoom", spec: b.dataset.z, prev: S.overlay }; ensureModalHost(); renderModal(); break;
+    case "closezoom": S.overlay = S.overlay && S.overlay.prev || null; if (S.screen === "setup" && !S.overlay) { const m = $("#modal"); if (m) m.remove(); } else renderModal(); break;
+    case "size": S.cardSize = b.dataset.v; store.set("cardSize", S.cardSize); applySize(); if (S.game) renderGame(true); break;
+    case "closeov": S.overlay = null; if (S.screen === "setup") { const m = $("#modal"); if (m) m.remove(); } else renderModal(); break;
+    case "passok": { const ov = S.overlay; S.overlay = null; ov.res(); break; }
+    // actions
+    case "run": S.run = { line: [], gear: new Set() }; renderGame(); break;
+    case "cancelrun": S.run = null; renderGame(); break;
+    case "clearline": if (S.run) { S.run.line = []; renderGame(); } break;
+    case "adddog": if (S.run && !S.run.line.includes(id) && !(g.rules.lineMax && S.run.line.length >= g.rules.lineMax)) { S.run.line.push(id); renderGame(); } break;
+    case "rmdog": if (S.run) { S.run.line = S.run.line.filter(x => x !== id); renderGame(); } break;
+    case "mv": if (S.run) { const L = S.run.line, i = L.indexOf(id), j = i + +b.dataset.d; if (j >= 0 && j < L.length) { [L[i], L[j]] = [L[j], L[i]]; renderGame(); } } break;
+    case "togglegear": if (S.run) { S.run.gear.has(id) ? S.run.gear.delete(id) : S.run.gear.add(id); renderGame(); } break;
+    case "autoline": if (S.run && pd) {
+      const p = pd.p;
+      const all = [...g.rested(p)].map(d => ({ dog: d, st: "rested" }));
+      let line = LT.Bot.arrange(all);
+      const pv = g.preview(p, line, [], { stopAtHidden: true });
+      if (!pv.crossed) { line = LT.Bot.arrange(all.concat(g.tired(p).map(d => ({ dog: d, st: "tired" })))); }
+      if (g.rules.lineMax) {
+        const pick = LT.Bot.arrange(all).sort((a, b) => (b.dog.rs + (b.dog.role !== "Team" ? 1 : 0)) - (a.dog.rs + (a.dog.role !== "Team" ? 1 : 0))).slice(0, g.rules.lineMax);
+        line = LT.Bot.arrange(pick);
+      }
+      S.run.line = line.map(x => x.dog.id); renderGame();
+    } break;
+    case "go": if (S.run && pd) resolvePending({ type: "run", line: S.run.line.map(x => ({ id: x })), gear: [...S.run.gear] }); break;
+    case "slog": if (pd) { const c = $("#uselantern"); resolvePending({ type: "slog", lantern: c ? c.checked : false }); } break;
+    case "camp": if (pd) { const c = $("#usebivy"); resolvePending({ type: "camp", bivy: c ? c.checked : false }); } break;
+    case "cpcamp": if (pd) resolvePending({ type: "cp", long: false }); break;
+    case "longrest": if (pd) resolvePending({ type: "cp", long: true }); break;
+    case "usegear": if (pd) {
+      const p = pd.p, gr = p.gear.find(x => x.id === id);
+      if (!gr) break;
+      if (gr.name === "Dog Food" || gr.name === "Whistle") {
+        const opts = gr.name === "Dog Food" ? g.exh(p) : g.tired(p);
+        if (opts.length === 1) resolvePending({ type: "gear", gear: id, target: opts[0].id });
+        else { S.overlay = { type: "freepick", p, gear: gr, options: opts }; renderModal(); }
+      } else resolvePending({ type: "gear", gear: id });
+    } break;
+    case "freepickdog": { const ov = S.overlay; S.overlay = null; resolvePending({ type: "gear", gear: ov.gear.id, target: id }); break; }
+    // modal answers
+    case "ok": resolvePending(true); break;
+    case "pick": if (pd) {
+      const v = b.dataset.v, t = pd.req.type;
+      if (t === "pickEvent") resolvePending(+v);
+      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP") resolvePending(v === "1");
+      else resolvePending(v);
+    } break;
+    case "keeptoggle": if (pd) {
+      const sel = S.keepSel || (S.keepSel = new Set());
+      if (sel.has(id)) sel.delete(id); else if (sel.size < pd.req.keep) sel.add(id);
+      renderModal();
+    } break;
+    case "keepok": if (pd) { const v = [...(S.keepSel || [])]; S.keepSel = null; resolvePending(v); } break;
+  }
+});
+document.addEventListener("dragstart", e => {
+  const z = e.target.closest && e.target.closest("[data-drag]");
+  if (!z) return;
+  S.dragId = z.dataset.drag; z.classList.add("dragging");
+  try { e.dataTransfer.setData("text/plain", S.dragId); e.dataTransfer.effectAllowed = "move"; } catch {}
+});
+document.addEventListener("dragover", e => {
+  const z = e.target.closest && e.target.closest("[data-drag]");
+  if (!z || !S.dragId) return;
+  e.preventDefault();
+  document.querySelectorAll(".zz.over").forEach(x => x !== z && x.classList.remove("over"));
+  z.classList.add("over");
+});
+document.addEventListener("drop", e => {
+  const z = e.target.closest && e.target.closest("[data-drag]");
+  if (!z || !S.dragId || !S.run) return;
+  e.preventDefault();
+  const L = S.run.line, from = L.indexOf(S.dragId), to = L.indexOf(z.dataset.drag);
+  if (from >= 0 && to >= 0 && from !== to) { L.splice(to, 0, L.splice(from, 1)[0]); }
+  S.dragId = null; renderGame();
+});
+document.addEventListener("dragend", () => { S.dragId = null; document.querySelectorAll(".dragging,.over").forEach(x => x.classList.remove("dragging", "over")); });
+document.addEventListener("toggle", e => { if (e.target && e.target.id === "logwrap") store.set("logOpen", e.target.open); }, true);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && S.overlay && S.overlay.type === "zoom") { S.overlay = S.overlay.prev || null; if (S.screen === "setup" && !S.overlay) { const m = $("#modal"); if (m) m.remove(); } else renderModal(); return; }
+  if (e.key === "Escape" && S.overlay && (S.overlay.type === "rules" || S.overlay.type === "freepick" || S.overlay.type === "artcheck")) { S.overlay = null; renderModal(); }
+});
+
+// ---------------- Boot ----------------
+(async () => {
+  applySize();
+  render();
+  const had = await restoreFiles();
+  if (!had) await loadManifest();
+  if (S.screen === "setup") renderSetup();
+})();
+window.__LT = S;
+})();
+</script>
+
+</body>
+</html>
