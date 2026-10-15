@@ -872,10 +872,19 @@ const LT = (() => {
       const nxt = p.pos + 1;
       const slogDest = nxt < this.path.length && this.path[nxt].type !== "F" && !(here && here.type === "CP" && !this.canPassCP(p, p.pos)) ? nxt : null;
       const slogLeg = slogDest != null ? this.legOf(slogDest) : null;
-      const canSlog = slogDest != null && !p.slogLegs.has(slogLeg);
-      // can run at all? (with every rested+tired dog, no gear)
+      // Slog only when stuck: every rested and tired dog together (no gear) can't move onto the next trail.
+      const stuck = !this.canRunNext(p);
+      const canSlog = slogDest != null && !p.slogLegs.has(slogLeg) && (this.rules.freeSlog || stuck);
       return { atOpenCP, cp: atOpenCP ? here.cp : null, mustLongRest: atOpenCP && here.cp === 2 && !p.longRested,
-        canSlog, slogUsed: slogDest != null && p.slogLegs.has(slogLeg), canPass: !(here && here.type === "CP" && !this.canPassCP(p, p.pos)) };
+        canSlog, stuck, slogNotStuck: slogDest != null && !p.slogLegs.has(slogLeg) && !this.rules.freeSlog && !stuck,
+        slogUsed: slogDest != null && p.slogLegs.has(slogLeg), canPass: !(here && here.type === "CP" && !this.canPassCP(p, p.pos)) };
+    }
+    canRunNext(p) {
+      const sp = d => d.state === "rested" ? d.rs : d.ts;
+      let pool = p.dogs.filter(d => d.state !== "exh").sort((a, b) => sp(b) - sp(a)).map(d => ({ dog: d, st: d.state }));
+      if (!pool.length) return false;
+      if (this.rules.lineMax) pool = pool.slice(0, this.rules.lineMax);
+      return this.preview(p, Bot.arrange(pool), [], { known: true }).crossed >= 1;
     }
 
     async useFreeGear(p, gid, target) {
@@ -1709,7 +1718,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 12:15 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 12:53 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1959,7 +1968,7 @@ function actionsHTML(p) {
   const safeCamp = (here && here.type === "T" && here.name === "Spruce Forest") || (p.musher === "Night Runner" && p.after);
   const vetSafe = p.musher === "Veteran" && !p.after;
   let slogWhy = "";
-  if (!L.canSlog) slogWhy = L.slogUsed ? "Already slogged this leg." : !L.canPass ? "Take your Long Rest first." : "You can't slog onto the Finish.";
+  if (!L.canSlog) slogWhy = L.slogUsed ? "Already slogged this leg." : !L.canPass ? "Take your Long Rest first." : L.slogNotStuck ? "Your dogs can still reach the next trail, so Run or Camp. You can only Slog when they can't." : "You can't slog onto the Finish.";
   const btn = (act, title, sub, opts = {}) => `<button class="act ${opts.primary ? "primary" : ""}" data-act="${act}" ${opts.disabled ? "disabled" : ""}><b>${title}</b><span>${sub}</span></button>`;
   let h = `<h3>Your turn</h3><div class="small">${esc(g.label(p.pos))}</div><div class="acts">`;
   if (L.atOpenCP) {
@@ -2307,7 +2316,7 @@ function rulesHTML() {
     <li>To move onto a trail, your Speed must cover its Difficulty; spend that much and keep going while you can. Drafting: a trail's Difficulty is 1 less if another musher is on or past it (Deep Powder: 3 less).</li>
     <li>After a Run, rested dogs that ran become tired, tired ones become exhausted. Then draw any River Ice Event, then push Events: ran any tired dogs? Draw 1 Event.</li>
     <li>If your Run ends on a trail with a reward (or stops at a checkpoint right after one), take it.</li>
-    <li><b>Slog:</b> move one trail with no dogs and draw an Event. Once per leg. No reward.</li>
+    <li><b>Slog:</b> only when your rested and tired dogs together can't move onto the next trail. Move one trail with no dogs and draw an Event. Once per leg. No reward.</li>
     <li><b>Camp:</b> draw an Event first, then all tired and exhausted dogs return to your hand. Used gear stays used.</li></ul></details>
   <details class="rules"><summary>Checkpoints and the Long Rest</summary><ul>
     <li>Checkpoints have Difficulty 0. Reaching the last trail of a leg puts you in the checkpoint; with Speed left you may stop or keep going.</li>
@@ -2549,7 +2558,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 12:15 PM";
+const LT_BUILD = "Oct 15, 12:53 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
