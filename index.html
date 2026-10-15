@@ -309,6 +309,8 @@ html.phone .acts .act span { font-size: 12px; }
 .mvseat { display: flex; flex-direction: column; gap: 2px; }
 .mvseat button { padding: 0 7px; font-size: 11px; line-height: 16px; }
 .seat { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) auto minmax(0, 170px) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
+.deckc { display: inline-flex; align-items: center; gap: 4px; }
+.deckc img { height: 24px; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
 .seat .keptline { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .seat .keptline .ghost { padding: 1px 8px; font-size: 12px; }
 .carry { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -1509,6 +1511,10 @@ function musherCard(p, o = {}) {
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(p.musher)}</div><div class="cs">${p.after ? "After Long Rest" : "Before Long Rest"}</div><div class="cx">${esc(t[p.after ? 1 : 0])}</div>`;
   return `<div class="card musher" data-zoom="${esc("musher|" + p.musher + "|" + (p.after ? 1 : 0))}" title="${esc(p.musher)}">${url && p.after ? inner.replace('class="art"', 'class="art" style="transform:rotate(180deg)"') : inner}</div>`;
 }
+function deckChip(kind, label, n) {
+  const u = artFor(artKeys.back(kind));
+  return `<span class="deckc" title="${label} left in the deck">${u ? `<img src="${esc(u)}" alt="">` : ""}${label} left <b>${n}</b></span>`;
+}
 function backCard(kind, o = {}) {
   const url = artFor(artKeys.back(kind));
   return `<div class="card back ${o.cls || ""}">${url ? img(url) : `<span class="bt">LONG<br>TRAIL</span>`}</div>`;
@@ -1728,7 +1734,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 1:15 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 1:21 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1832,7 +1838,7 @@ function renderGame(full) {
     renderLog(true);
   }
   const cur = g.current;
-  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No final-leg Events</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
+  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No final-leg Events</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span>${deckChip("dog", "Dogs", g.dogDeck.length)}${deckChip("gear", "Gear", g.gearDeck.length)}${deckChip("event", "Events", g.eventDeck.length)}`;
   renderStrip();
   $("#players").innerHTML = g.players.map(p => `
     <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
@@ -2564,7 +2570,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 1:15 PM";
+const LT_BUILD = "Oct 15, 1:21 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
