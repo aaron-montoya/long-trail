@@ -573,9 +573,9 @@ const LT = (() => {
     leadBonus(p, line, gearSel) {
       if (!line.length) return 0;
       const f = line[0];
-      if (f.st !== "rested" || f.dog.role !== "Lead") return 0;
-      let b = f.dog.ab === "comet" ? 2 : 1;
-      if (f.dog.ab === "flighty" && line.length < 3) b = 0;
+      if (f.dog.role !== "Lead") return 0; // roles count rested or tired; abilities only when rested
+      let b = f.st === "rested" && f.dog.ab === "comet" ? 2 : 1;
+      if (f.st === "rested" && f.dog.ab === "flighty" && line.length < 3) b = 0;
       if (b && p.musher === "Champion" && !p.after) b += 1;
       if (gearSel.some(g => g.name === "Golden Harness")) b *= 2;
       return b;
@@ -600,7 +600,7 @@ const LT = (() => {
         add(v, d.name);
       });
       add(this.leadBonus(p, line, gearSel), "Lead bonus");
-      if (line.length && line[line.length - 1].st === "rested" && line[line.length - 1].dog.role === "Wheel") add(1, "Wheel bonus");
+      if (line.length && line[line.length - 1].dog.role === "Wheel") add(1, "Wheel bonus");
       const m = p.musher, af = p.after;
       if (m === "Sprinter") add(af ? 1 : 2, "Sprinter");
       if (m === "Champion" && af) add(2, "Champion");
@@ -1171,14 +1171,14 @@ const LT = (() => {
   const Bot = {
     arrange(dogs) { // dogs: [{dog, st}] -> best order
       const r = dogs.filter(x => x.st === "rested"), t = dogs.filter(x => x.st === "tired");
-      const leads = r.filter(x => x.dog.role === "Lead");
+      const leads = dogs.filter(x => x.dog.role === "Lead");
       const n = dogs.length;
-      const lv = x => (x.dog.ab === "comet" ? 2 : x.dog.ab === "flighty" && n < 3 ? 0 : 1) + (x.dog.ab === "birch" && n >= 2 ? 2 : 0);
+      const lv = x => x.st !== "rested" ? 1 : (x.dog.ab === "comet" ? 2 : x.dog.ab === "flighty" && n < 3 ? 0 : 1) + (x.dog.ab === "birch" && n >= 2 ? 2 : 0);
       leads.sort((a, b) => lv(b) - lv(a));
       const first = leads[0] || null;
       const yukon = r.find(x => x.dog.ab === "lastonly") || null;
       let rest = dogs.filter(x => x !== first && x !== yukon);
-      const wheels = rest.filter(x => x.st === "rested" && x.dog.role === "Wheel");
+      const wheels = rest.filter(x => x.dog.role === "Wheel").sort((a, b) => (b.st === "rested") - (a.st === "rested"));
       const last = yukon || wheels[0] || null;
       rest = rest.filter(x => x !== last);
       const mitts = rest.find(x => x.st === "rested" && x.dog.ab === "mitts");
@@ -1638,7 +1638,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 11:10 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 11:18 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2189,7 +2189,7 @@ function zoomHTML(spec) {
     const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: r[5] };
     return `<div class="zoomview">${dogCard(d, { state: "rested", flat: true })}<div class="zt"><div class="label">${d.role} dog${b && b !== "rested" ? " · " + (b === "exh" ? "exhausted" : b) : ""}</div><h3>${esc(d.name)}</h3>
       <p>Rested Speed <b>${d.rs}</b> · Tired Speed <b>${d.ts}</b></p>${d.text ? `<p>${esc(d.text)}</p>` : `<p class="small">No ability.</p>`}
-      <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first, rested." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last, rested." : "Team: no position bonus."}</p></div></div>`;
+      <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first, rested or tired." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last, rested or tired." : "Team: no position bonus."} Abilities only work while the dog is rested.</p></div></div>`;
   }
   if (kind === "gear") {
     const r = LT.GEAR.find(x => x[0] === a); if (!r) return "";
@@ -2230,7 +2230,7 @@ function rulesHTML() {
   return `<h3>Long Trail · quick rules</h3>
   <p class="small">This race: ${legs.join("-")} trails${rules.lineMax ? ` · ${rules.lineMax}-dog gangline` : ""} · ${gen ? "well-stocked" : "standard"} checkpoints.</p>
   <details class="rules" open><summary>Your turn: Run, Slog or Camp</summary><ul>
-    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you)${rules.lineMax ? `, at most ${rules.lineMax} dogs` : ""}. Rested dogs use full Speed, ability and role bonus; tired dogs only tired Speed. Lead first +1, Wheel last +1.</li>
+    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you)${rules.lineMax ? `, at most ${rules.lineMax} dogs` : ""}. Rested dogs use full Speed, ability and role bonus; tired dogs use tired Speed and role bonus, but not their ability. Lead first +1, Wheel last +1.</li>
     <li>Pay each trail's cost to move onto it and keep going while you can. Drafting: a trail costs 1 less if another musher is on or past it (Deep Powder: 3 less).</li>
     <li>After a Run, rested dogs that ran become tired, tired ones become exhausted. Then draw any River Ice Event, then push Events: ran any tired dogs? Draw 1 Event.</li>
     <li>If your Run ends on a trail with a reward (or stops at a checkpoint right after one), take it.</li>
@@ -2470,7 +2470,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 11:10 AM";
+const LT_BUILD = "Oct 15, 11:18 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
