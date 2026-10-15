@@ -145,14 +145,12 @@ button.ghost { background: transparent; }
 
 /* the hand */
 .handzone { margin-top: 14px; }
-.hand { display: flex; justify-content: center; align-items: flex-end; padding: 34px 8px 8px; min-height: calc(var(--handw) * 1.4 + 46px); overflow: hidden; }
-.hc { position: relative; flex: none; margin-left: var(--ov, -24px); transform: translateY(var(--dy, 0)) rotate(var(--rot, 0deg)); transform-origin: 50% 130%; transition: transform .16s ease, margin .16s ease; z-index: var(--z, 1); }
-.hc:first-child { margin-left: 0; }
-.hc.gap { margin-left: calc(var(--ov, -24px) + 16px); }
-.hc:hover, .hc:focus-within { transform: translateY(-22px) rotate(0deg) scale(1.04); z-index: 30; }
-.hc.inline { transform: translateY(-14px) rotate(var(--rot, 0deg)); }
+.hand { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; align-items: flex-start; padding: 8px 0 4px; }
+.hc { position: relative; flex: none; transition: transform .12s ease; }
+.hc.gap { margin-left: 14px; }
+.hc:hover, .hc:focus-within { transform: translateY(-4px); }
 .hc.inline .card { opacity: .45; }
-.hc .usebtn { position: absolute; left: 6px; bottom: 10px; z-index: 5; font-size: 13px; padding: 4px 12px; font-weight: 700; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.hc .usebtn { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 5; font-size: 13px; padding: 4px 12px; font-weight: 700; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .hand .empty { color: var(--muted); align-self: center; }
 @media (prefers-reduced-motion: reduce) { .hc { transition: none; } }
 
@@ -1763,7 +1761,7 @@ function renderBoard() {
   const maxDy = Math.pow((n - 1) / 2, 2) * step * 0.9;
   const hand = items.map((it, i) => {
     const o = i - (n - 1) / 2;
-    return `<div class="hc ${it.inline ? "inline" : ""} ${it.gap ? "gap" : ""}" style="--rot:${(o * step).toFixed(2)}deg;--dy:${(o * o * step * 0.9).toFixed(1)}px;--z:${i + 1}">${it.html}</div>`;
+    return `<div class="hc ${it.inline ? "inline" : ""} ${it.gap ? "gap" : ""}">${it.html}</div>`;
   }).join("");
 
   el.innerHTML = `
@@ -1779,7 +1777,7 @@ function renderBoard() {
     <div class="tableau" aria-label="In front of you">${tz.join("") || `<span class="empty">Nothing in front of you. Every dog is rested.</span>`}</div>
     <div class="handzone">
       <div class="label">Your hand · ${rested.length} dog${rested.length === 1 ? "" : "s"}, ${p.gear.length} gear${run ? " · tap dogs to add them to your line" : " · tap a card to look closer"}</div>
-      <div class="hand" id="hand" data-maxrot="${((n - 1) / 2 * step).toFixed(2)}" style="padding-bottom:${Math.round(maxDy + 14)}px">${hand || `<span class="empty">Your hand is empty.</span>`}</div>
+      <div class="hand" id="hand">${hand || `<span class="empty">Your hand is empty.</span>`}</div>
     </div>`;
   fitHand();
 
@@ -1788,6 +1786,7 @@ function renderBoard() {
 }
 
 function fitHand() {
+  return; // cards sit side by side now; nothing to fit
   const h = $("#hand"); if (!h) return;
   const cards = h.querySelectorAll(".hc");
   if (cards.length < 2) return;
