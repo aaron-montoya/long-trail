@@ -638,7 +638,7 @@ const LT = (() => {
     preview(p, line, gearSel = [], opts = {}) {
       const known = opts.known !== false;
       const sp = this.speedOf(p, line, gearSel);
-      let pool = sp.total, pos = p.pos, crossed = 0, finished = false, unknownHit = false, hiddenNext = false, tankBlock = false;
+      let pool = sp.total, pos = p.pos, crossed = 0, finished = false, unknownHit = false, hiddenNext = false, tankBlock = false, capped = false, finalCount = 0;
       const heavy = line.some(x => x.st === "rested" && x.dog.ab === "heavy");
       const steps = [];
       while (true) {
@@ -649,12 +649,14 @@ const LT = (() => {
           if (opts.stopAtNewCP && crossed > 0 && !p.camped.has(this.path[pos].cp)) break;
         }
         const c = this.path[nxt];
+        if (this.rules.finalRunMax && this.finalLeg(nxt) && finalCount >= this.rules.finalRunMax) { capped = true; break; }
         if (opts.stopAtHidden && c.type === "T" && !c.up) { hiddenNext = true; break; }
         if (c.type === "T" && c.name === "River Ice" && heavy && c.up) { tankBlock = true; break; }
         let cost = this.trailCost(p, nxt, line, gearSel, true);
         if (c.type === "T" && !c.up && !known) { cost = UNKNOWN_COST; unknownHit = true; }
         if (cost > pool) break;
         pool -= cost; pos = nxt; crossed++;
+        if (this.finalLeg(nxt)) finalCount++;
         steps.push({ pos, cost, up: c.type !== "T" || c.up });
         if (c.type === "F") { finished = true; break; }
         if (nxt + 1 < this.path.length && this.path[nxt + 1].type === "CP") {
@@ -662,7 +664,7 @@ const LT = (() => {
           steps.push({ pos, cost: 0, up: true });
         }
       }
-      return { speed: sp.total, parts: sp.parts, crossed, finished, end: pos, left: pool, steps, unknownHit, hiddenNext, tankBlock };
+      return { speed: sp.total, parts: sp.parts, crossed, finished, end: pos, left: pool, steps, unknownHit, hiddenNext, tankBlock, capped };
     }
 
     // ---------- events ----------
@@ -895,13 +897,14 @@ const LT = (() => {
       // spend gear
       for (const g of gearSel) { p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g); }
       this.log(`${p.name} runs ${line.map(x => x.dog.name + (x.st === "tired" ? " (tired)" : "")).join(", ")}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}: Speed ${sp.total}.`, "act");
-      let pool = sp.total, crossed = 0;
+      let pool = sp.total, crossed = 0, finalCount = 0;
       const start = p.pos;
       while (!this.over && !p.scratched) {
         const pos = p.pos, nxt = pos + 1;
         if (nxt >= this.path.length) break;
         if (pos >= 0 && this.path[pos].type === "CP" && !this.canPassCP(p, pos)) break;
         const c = this.path[nxt];
+        if (this.rules.finalRunMax && this.finalLeg(nxt) && finalCount >= this.rules.finalRunMax) { this.log(`The storm limits ${p.name} to ${this.rules.finalRunMax} final-leg trail${this.rules.finalRunMax > 1 ? "s" : ""} this Run.`, ""); break; }
         if (c.type === "T" && !c.up) this.flip(nxt);
         if (c.type === "T" && c.name === "River Ice" && heavy) { this.log(`Tank refuses to step onto River Ice.`, ""); break; }
         const cost = this.trailCost(p, nxt, line, gearSel);
@@ -912,6 +915,7 @@ const LT = (() => {
           if (!go) { this.log(`${p.name} stops at Checkpoint ${this.path[pos].cp}.`, "act"); break; }
         }
         pool -= cost; p.pos = nxt; crossed++;
+        if (this.finalLeg(nxt)) finalCount++;
         this.onMoveOnto(nxt);
         this.upd();
         if (c.type === "F") {
@@ -1633,7 +1637,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 10:57 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 11:04 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1644,7 +1648,7 @@ function renderSetup() {
       <span class="small" style="align-self:center">Later seats start with extra gear: +1, +2, +3.</span></div>
     </div>
     <div class="panel">
-      ${(() => { const isStd = S.legs.join("-") === "1-2-4" && S.mode !== "generous" && S.rules.lineMax === 6 && S.rules.noHarsh && !S.rules.noStorm && !S.rules.noPushPerDog && !S.rules.vetCheck && !S.rules.bigLine;
+      ${(() => { const isStd = S.legs.join("-") === "1-2-4" && S.mode !== "generous" && S.rules.lineMax === 6 && S.rules.noHarsh && !S.rules.noStorm && !S.rules.noPushPerDog && !S.rules.vetCheck && !S.rules.bigLine && !S.rules.finalRunMax && !S.rules.handLimit;
         return `<div class="stdline">${isStd ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · standard checkpoints · 6-dog gangline · storm and no easy pushing on the final leg · no harsh weather</span>` : `<span class="chip warn">Custom rules</span><button data-act="stdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>`; })()}
       <div class="label">Trail layout</div>
       <div class="legs">
@@ -1666,6 +1670,7 @@ function renderSetup() {
       <div class="modes">
         <label><span style="flex:none"><select id="rule-line"><option value="0" ${!S.rules.lineMax ? "selected" : ""}>No limit</option><option value="7" ${S.rules.lineMax == 7 ? "selected" : ""}>7 dogs</option><option value="6" ${S.rules.lineMax == 6 ? "selected" : ""}>6 dogs (standard)</option><option value="5" ${S.rules.lineMax == 5 ? "selected" : ""}>5 dogs</option></select></span><span><b>Gangline limit</b><small>The most dogs you can run in one line.</small></span></label>
         <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is sent home.</small></span></label>
+        <label><input type="checkbox" id="rule-cap" ${S.rules.finalRunMax ? "checked" : ""}> <span><b>Whiteout pace</b><small>On the final leg, a Run can cross at most 3 cards (the Finish counts). No crossing the whole final leg in one turn.</small></span></label>
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
       <div class="opts" style="margin-top:12px">
@@ -1737,7 +1742,7 @@ function renderGame(full) {
     renderLog(true);
   }
   const cur = g.current;
-  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
+  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.finalRunMax ? `<span class="chip">Whiteout pace</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
   renderStrip();
   $("#players").innerHTML = g.players.map(p => `
     <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
@@ -2003,7 +2008,7 @@ function runPanelHTML(p) {
     const pv = pr.pv;
     let where;
     if (pv.finished) where = `<b>Reaches the Finish and wins!</b>`;
-    else if (pv.crossed) where = `Reaches <b>${esc(g.label(pv.end))}</b> with ${pv.left} Speed left${pv.hiddenNext ? " for the face-down trail ahead" : ""}.`;
+    else if (pv.crossed) where = `Reaches <b>${esc(g.label(pv.end))}</b> with ${pv.left} Speed left${pv.capped ? ` (Whiteout pace: ${g.rules.finalRunMax} final-leg cards per Run)` : pv.hiddenNext ? " for the face-down trail ahead" : ""}.`;
     else where = `<b style="color:var(--bad)">Can't pay for the next trail${pv.tankBlock ? " (Tank won't step onto River Ice)" : ""}.</b>`;
     const pushed = pr.line.filter(x => x.st === "tired").length;
     const booties = pr.gear.some(x => x.name === "Booties");
@@ -2222,6 +2227,7 @@ function rulesHTML() {
   if (!rules.noStorm) fl.push("<b>Storm:</b> start your turn on a final-leg trail, draw an Event.");
   if (!rules.noHarsh) fl.push("<b>Harsh weather:</b> Events that remove a dog remove 2.");
   if (!rules.noPushPerDog) fl.push("<b>No easy pushing:</b> each pushed tired dog draws an Event.");
+  if (rules.finalRunMax) fl.push(`<b>Whiteout pace:</b> a Run can cross at most ${rules.finalRunMax} final-leg cards (the Finish counts).`);
   return `<h3>Long Trail · quick rules</h3>
   <p class="small">This race: ${legs.join("-")} trails${rules.lineMax ? ` · ${rules.lineMax}-dog gangline` : ""} · ${gen ? "well-stocked" : "standard"} checkpoints.</p>
   <details class="rules" open><summary>Your turn: Run, Slog or Camp</summary><ul>
@@ -2332,8 +2338,10 @@ document.addEventListener("change", async e => {
   if (t.id === "rule-storm") { if (t.checked) delete S.rules.noStorm; else S.rules.noStorm = true; store.set("rules", S.rules); }
   if (t.id === "rule-harsh") { if (t.checked) delete S.rules.noHarsh; else S.rules.noHarsh = true; store.set("rules", S.rules); }
   if (t.id === "rule-push") { if (t.checked) delete S.rules.noPushPerDog; else S.rules.noPushPerDog = true; store.set("rules", S.rules); }
+  if (t.id === "rule-cap") { if (t.checked) S.rules.finalRunMax = 3; else delete S.rules.finalRunMax; store.set("rules", S.rules); }
   if (t.id === "rule-vet") { if (t.checked) S.rules.vetCheck = true; else delete S.rules.vetCheck; store.set("rules", S.rules); }
   if (t.id === "rule-big") { if (t.checked) S.rules.bigLine = 5; else delete S.rules.bigLine; store.set("rules", S.rules); }
+  if (S.screen === "setup" && (t.name === "mode" || /^rule-/.test(t.id || ""))) { renderSetup(); return; }
   if (t.id === "layoutsel" || t.id === "layoutsel2") { S.layout = t.value; store.set("layout", S.layout); applySize(); if (S.game && S.screen === "game") renderGame(true); }
   if (t.id === "botspeed" || t.id === "botspeed2") { S.botSpeed = +t.value; store.set("botSpeed", S.botSpeed); }
   if (t.id === "artpick" || t.id === "artpick2") {
@@ -2464,7 +2472,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 10:57 AM";
+const LT_BUILD = "Oct 15, 11:04 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
