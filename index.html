@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
@@ -1618,7 +1619,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 10:46 AM</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2253,7 +2254,11 @@ function wantPhone() {
   const pref = S.layout || "auto";
   if (pref === "phone") return true;
   if (pref === "desktop") return false;
-  return window.matchMedia("(max-width: 700px)").matches || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth <= 1180);
+  if (window.matchMedia("(max-width: 700px)").matches) return true;
+  const touch = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches || (navigator.maxTouchPoints || 0) > 0;
+  const mobileUA = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
+  const w = Math.min(window.innerWidth || 9999, (window.screen && window.screen.width) || 9999);
+  return (touch || mobileUA) && w <= 1180;
 }
 function applyLayout() { document.documentElement.classList.toggle("phone", wantPhone()); }
 const isNarrow = () => document.documentElement.classList.contains("phone");
