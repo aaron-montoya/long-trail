@@ -356,7 +356,7 @@ const LT = (() => {
     ["Mitts", "Team", 2, 2, "mitts", "+2 if directly behind a Lead dog."],
     ["Echo", "Team", 2, 2, "echo", "+1 for each Team dog ahead of Echo in line."],
     ["Northstar", "Team", 2, 3, "tireless", "After running rested, Northstar returns to your hand instead of becoming tired."],
-    ["Flash", "Team", 4, 2, "fragile", "If an Event removes a dog while Flash is tired or exhausted, remove Flash."],
+    ["Flash", "Team", 4, 2, "fragile", "If an Event drops a dog while Flash is tired or exhausted, drop Flash."],
     ["Tundra", "Team", 1, 2, "packer", "+1 speed for each other dog in line."],
     ["Ranger", "Team", 2, 2, "scavenger", "If Ranger runs onto a reward trail, also take the top Gear card."],
     ["Cocoa", "Team", 2, 2, "cocoa", "While Cocoa is in your hand, when you camp in the open, draw 2 Events and choose 1."],
@@ -370,7 +370,7 @@ const LT = (() => {
     ["Brick", "Wheel", 1, 3, null, ""],
     ["Yukon", "Wheel", 3, 3, "lastonly", "Must run last in line."],
     ["Huckle", "Wheel", 2, 2, "rearguard", "While Huckle is in your hand, Squirrel! and Moose on the Trail have no effect on you."],
-    ["Boulder", "Wheel", 4, 3, "hardy", "The first time a Wheel dog would be removed each race, he becomes exhausted instead."],
+    ["Boulder", "Wheel", 4, 3, "hardy", "The first time a Wheel dog would be dropped each race, he becomes exhausted instead."],
   ];
 
   const GEAR = [
@@ -379,7 +379,7 @@ const LT = (() => {
     ["Dog Food", 3, "free", "Return one exhausted dog to your hand."],
     ["Snow Hook", 3, "run", "Mountain Pass and Deep Powder have 2 less Difficulty this Run."],
     ["Headlamp", 3, "free", "Look at the next two face-down trails."],
-    ["Sled Basket", 2, "react", "Play when a dog would be removed: it becomes exhausted instead. Then remove Sled Basket from the game."],
+    ["Sled Basket", 2, "react", "Play when a dog would be dropped: it becomes exhausted instead. Then remove Sled Basket from the game."],
     ["Bivy Sack", 3, "camp", "Play when you camp in the open: draw no Event."],
     ["Wax the Runners", 2, "run", "Every trail has 1 less Difficulty this Run (minimum 1)."],
     ["Whistle", 2, "free", "Return one tired dog to your hand."],
@@ -413,11 +413,11 @@ const LT = (() => {
     ["Northern Lights", 1, "Keep this card. Your next Run gets +2 Speed, then discard it."],
     ["Tailwind", 2, "Keep this card. Your next Run gets +1 Speed, then discard it."],
     ["Fresh Snow", 2, "Keep this card. On your next Run, every trail has 1 more Difficulty. Then discard this card."],
-    ["Bitter Cold", 8, "Remove one dog, tired or exhausted first."],
-    ["Blizzard", 3, "Remove one dog, tired or exhausted first. Then move back one trail, but never past a checkpoint."],
+    ["Bitter Cold", 8, "Drop one dog, tired or exhausted first."],
+    ["Blizzard", 3, "Drop one dog, tired or exhausted first. Then move back one trail, but never past a checkpoint."],
     ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
-    ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Remove it, unless you have a rested Wheel dog in your hand."],
-    ["Whiteout", 2, "Remove one tired or exhausted dog. Skip your next turn. Turn your musher sideways as a reminder."],
+    ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Drop it, unless you have a rested Wheel dog in your hand."],
+    ["Whiteout", 2, "Drop one tired or exhausted dog. Skip your next turn. Turn your musher sideways as a reminder."],
     ["Sore Paws", 2, "One of your tired dogs becomes exhausted."],
     ["Steep Climb", 1, "All your tired dogs become exhausted."],
     ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
@@ -793,7 +793,7 @@ const LT = (() => {
         if (use) {
           p.gear.splice(p.gear.indexOf(basket), 1);
           v.state = "exh";
-          this.log(`${p.name} loads ${v.name} into the Sled Basket. It's exhausted instead of removed.`, "good");
+          this.log(`${p.name} loads ${v.name} into the Sled Basket. It's exhausted instead of dropped.`, "good");
           return;
         }
       }
@@ -801,7 +801,7 @@ const LT = (() => {
       v.state = "removed";
       p.lost.push(v);
       this.stats.removed++;
-      this.log(`${v.name} heads home to rest by the fire (${cause}).`, "bad");
+      this.log(`${v.name} is dropped and heads home to rest by the fire (${cause}).`, "bad");
       if (!p.dogs.length) {
         p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
         this.log(`${p.name} has no dogs left and is scratched.`, "bad");
@@ -1639,7 +1639,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 11:28 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 11:30 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1665,13 +1665,13 @@ function renderSetup() {
       <div class="label" style="margin-top:14px">Final-leg weather</div>
       <div class="modes">
         <label><input type="checkbox" id="rule-storm" ${!S.rules.noStorm ? "checked" : ""}> <span><b>Storm</b><small>At the start of each of your turns, if you are on a final-leg trail, draw an Event.</small></span></label>
-        <label><input type="checkbox" id="rule-harsh" ${!S.rules.noHarsh ? "checked" : ""}> <span><b>Harsh weather</b><small>On the final leg, any Event that removes a dog removes 2 instead.</small></span></label>
+        <label><input type="checkbox" id="rule-harsh" ${!S.rules.noHarsh ? "checked" : ""}> <span><b>Harsh weather</b><small>On the final leg, any Event that drops a dog drops 2 instead.</small></span></label>
         <label><input type="checkbox" id="rule-push" ${!S.rules.noPushPerDog ? "checked" : ""}> <span><b>No easy pushing</b><small>On the final leg, draw one Event for each tired dog you push (instead of one per Run).</small></span></label>
       </div>
       <div class="label" style="margin-top:14px">Team and final-stretch rules</div>
       <div class="modes">
         <label><span style="flex:none"><select id="rule-line"><option value="0" ${!S.rules.lineMax ? "selected" : ""}>No limit</option><option value="7" ${S.rules.lineMax == 7 ? "selected" : ""}>7 dogs</option><option value="6" ${S.rules.lineMax == 6 ? "selected" : ""}>6 dogs (standard)</option><option value="5" ${S.rules.lineMax == 5 ? "selected" : ""}>5 dogs</option></select></span><span><b>Gangline limit</b><small>The most dogs you can run in one line.</small></span></label>
-        <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is sent home.</small></span></label>
+        <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is dropped.</small></span></label>
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
       <div class="opts" style="margin-top:12px">
@@ -1710,7 +1710,7 @@ function playerChips(p) {
   if (p.longRested) chips.push(`<span class="chip ok">Long Rest done</span>`);
   if (p.skip) chips.push(`<span class="chip warn">skips next turn</span>`);
   if (p.keptEvents.length) chips.push(`<span class="chip">${p.keptEvents.map(esc).join(", ")}</span>`);
-  if (p.lost.length) chips.push(`<span class="chip warn">lost ${p.lost.length}</span>`);
+  if (p.lost.length) chips.push(`<span class="chip warn">dropped ${p.lost.length}</span>`);
   if (p.scratched) chips.push(`<span class="chip warn">scratched</span>`);
   return chips.join("");
 }
@@ -1844,7 +1844,7 @@ function renderBoard() {
       ${musherCard(p)}
       <div class="mtext">
         <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
-        <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · heading home: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
+        <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · dropped: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
         <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(LT.MUSHERS[p.musher][0])}</div>
         <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(LT.MUSHERS[p.musher][1])}</div>
       </div>
@@ -1912,7 +1912,7 @@ function actionsHTML(p) {
   if (L.mustLongRest) notes.push("You must take your Long Rest here before passing Checkpoint 2.");
   if (here && here.type === "T" && g.finalLeg(p.pos)) {
     const fl = [];
-    if (!g.rules.noHarsh) fl.push("Events that remove a dog remove 2");
+    if (!g.rules.noHarsh) fl.push("Events that drop a dog drop 2");
     if (!g.rules.noPushPerDog) fl.push("each tired dog you push draws an Event");
     if (fl.length) notes.push(`Final leg: ${fl.join(", and ")}.`);
   }
@@ -2027,7 +2027,7 @@ function runPanelHTML(p) {
     let vetWarn = "";
     if (g.rules.vetCheck && p.pos < cp2 && pv.steps.some(s2 => s2.pos === cp2)) {
       const goners = [...g.exh(p), ...pr.line.filter(x => x.st === "tired").map(x => x.dog)];
-      vetWarn = goners.length ? `<div class="warn">Vet check at Checkpoint 2 will send home: ${goners.map(d => esc(d.name)).join(", ")}.</div>` : `<div class="breakdown">Vet check at Checkpoint 2: your team would pass.</div>`;
+      vetWarn = goners.length ? `<div class="warn">Vet check at Checkpoint 2 will drop: ${goners.map(d => esc(d.name)).join(", ")}.</div>` : `<div class="breakdown">Vet check at Checkpoint 2: your team would pass.</div>`;
     }
     after = `<div class="sumafter">
         <div>Total Speed <b>${pv.speed}</b>. ${where}</div>
@@ -2102,13 +2102,13 @@ function renderModal() {
     if (ov.type === "over") {
       const w = g.winner;
       return modal(`<h3>${w ? `${esc(w.name)} wins the Long Trail!` : "The trail wins this time."}</h3>
-        <p class="small">${g.round} rounds · ${g.stats.events} Events drawn · ${g.stats.removed} dogs sent home.</p>
+        <p class="small">${g.round} rounds · ${g.stats.events} Events drawn · ${g.stats.removed} dogs dropped.</p>
         <p><b>Race time ${fmt(T.active())}</b> · about ${fmt(T.active() / Math.max(1, g.round))} per round.</p>
         <table class="times"><thead><tr><th>Musher</th><th>Turns</th><th>Time on turns</th><th>Per turn</th></tr></thead><tbody>
         ${g.players.map(p => `<tr><td><b style="color:${p.color}">${esc(p.name)}</b>${p.bot ? " (bot)" : ""}</td><td>${T.turns[p.idx]}</td><td>${fmt(T.per[p.idx])}</td><td>${T.turns[p.idx] ? fmt(T.per[p.idx] / T.turns[p.idx]) : "–"}</td></tr>`).join("")}
         </tbody></table>
         ${g.players.some(p => p.bot) ? `<p class="small">Bot turns count toward the race time at the bot speed you picked. For a table estimate, look at the human per-turn times.</p>` : ""}
-        <ul>${g.players.map(p => `<li><b style="color:${p.color}">${esc(p.name)}</b> (${esc(p.musher)}): ${p.scratched ? "scratched" : esc(g.label(p.pos))}, ${p.dogs.length} dogs left${p.lost.length ? `, lost ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</li>`).join("")}</ul>
+        <ul>${g.players.map(p => `<li><b style="color:${p.color}">${esc(p.name)}</b> (${esc(p.musher)}): ${p.scratched ? "scratched" : esc(g.label(p.pos))}, ${p.dogs.length} dogs left${p.lost.length ? `, dropped ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</li>`).join("")}</ul>
         <div class="btns"><button data-act="closeover">Look at the board</button><button data-act="newrace">New race</button><button class="primary" data-act="rematch">Rematch</button></div>`);
     }
     if (ov.type === "rules") return modal(rulesHTML());
@@ -2127,7 +2127,7 @@ function renderModal() {
     case "event":
       return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3>
         <div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>${r.ignored ? `<p class="small" style="color:var(--good)">${esc(r.ignored)}</p>` : ""}
-        ${g.finalLeg(p.pos) && !g.rules.noHarsh && /[Rr]emove/.test(LT.EVENT_TEXT[r.card]) && !r.ignored ? `<p class="small" style="color:var(--bad)">Harsh weather: this removes 2 dogs on the final leg.</p>` : ""}
+        ${g.finalLeg(p.pos) && !g.rules.noHarsh && /[Rr]emove/.test(LT.EVENT_TEXT[r.card]) && !r.ignored ? `<p class="small" style="color:var(--bad)">Harsh weather: this drops 2 dogs on the final leg.</p>` : ""}
         <div class="btns"><button class="primary" data-act="ok">OK</button></div>`);
     case "pickEvent":
       return modal(`<div class="label">${esc(p.name)} · ${p.musher === "Gambler" ? "Gambler" : "Cocoa"} · Event from ${esc(r.source)}</div><h3>Choose one Event</h3>
@@ -2144,7 +2144,7 @@ function renderModal() {
           ? dogCard(d, { pick: true, flat: true, attrs: `data-act="pick" data-v="${d.id}"`, flag: stateName(d) })
           : dogCard(d, { flat: true, dim: true, flag: stateName(d) })).join("");
       const harsh = r.n > 1 ? ` (${r.k} of ${r.n}, harsh weather)` : "";
-      return modal(`<div class="label">${esc(p.name)} · ${esc(r.cause)}${harsh}</div><h3>${r.type === "removeDog" ? "Choose a dog to send home" : "Choose a tired dog to exhaust"}</h3>
+      return modal(`<div class="label">${esc(p.name)} · ${esc(r.cause)}${harsh}</div><h3>${r.type === "removeDog" ? "Choose a dog to drop" : "Choose a tired dog to exhaust"}</h3>
         <p class="small">${esc(r.reason || "")} Tap a bright card to choose it.${r.options.length === 1 ? " Only one dog can be chosen right now." : ""}</p>
         <div class="cards">${cards}</div>`);
     }
@@ -2163,7 +2163,7 @@ function renderModal() {
     case "sledBasket": {
       const d = findDog(r.dog);
       return modal(`<div class="label">${esc(p.name)} · ${esc(r.cause)}</div><h3>Use your Sled Basket?</h3><div class="cards">${dogCard(d, { flat: true })}</div>
-        <p>${esc(d.name)} would be removed. The Sled Basket makes it exhausted instead, then the Basket leaves the game.</p>
+        <p>${esc(d.name)} would be dropped. The Sled Basket makes it exhausted instead, then the Basket leaves the game.</p>
         <div class="btns"><button data-act="pick" data-v="0">Let it go</button><button class="primary" data-act="pick" data-v="1">Use Sled Basket</button></div>`);
     }
     case "stopAtCP":
@@ -2173,7 +2173,7 @@ function renderModal() {
     case "vetCheck":
       return modal(`<div class="label">${esc(p.name)} · Checkpoint 2</div><h3>Vet check</h3>
         ${r.cards.length ? `<p>The vet sends home every exhausted dog and every dog you pushed to get here.${r.scratched ? " <b>That was your whole team. You're scratched.</b>" : ""}</p>
-          <div class="cards">${r.cards.map(d => dogCard(d, { flat: true, flag: "heading home" })).join("")}</div>` : `<p>Every dog passes. Nobody is sent home.</p>`}
+          <div class="cards">${r.cards.map(d => dogCard(d, { flat: true, flag: "dropped" })).join("")}</div>` : `<p>Every dog passes. Nobody is dropped.</p>`}
         <div class="btns"><button class="primary" data-act="ok">OK</button></div>`);
     case "peek":
       return modal(`<div class="label">${esc(p.name)} · ${esc(r.source)} · only you see this</div><h3>${r.trails.length ? "The trail ahead" : "Nothing left to see"}</h3>
@@ -2196,13 +2196,13 @@ function zoomHTML(spec) {
     const r = LT.GEAR.find(x => x[0] === a); if (!r) return "";
     const pd = S.pending, me = pd && pd.req.type === "action" && !pd.p.bot ? pd.p : null;
     const mine = me && me.gear.find(x => x.name === a && x.when === "free" && canUseFree(me, S.game, x));
-    const why = me && me.gear.some(x => x.name === a) && !mine ? (r[2] === "run" ? "Tick it under “Gear for this Run” when you set up a Run." : r[2] === "camp" ? "Used when you Camp in the open (tick the box under Camp)." : r[2] === "slog" ? "Used when you Slog (tick the box under Slog)." : r[2] === "react" ? "You'll be asked to use it when a dog would be removed." : "Nothing for it to do right now.") : "";
+    const why = me && me.gear.some(x => x.name === a) && !mine ? (r[2] === "run" ? "Tick it under “Gear for this Run” when you set up a Run." : r[2] === "camp" ? "Used when you Camp in the open (tick the box under Camp)." : r[2] === "slog" ? "Used when you Slog (tick the box under Slog)." : r[2] === "react" ? "You'll be asked to use it when a dog would be dropped." : "Nothing for it to do right now.") : "";
     return `<div class="zoomview">${gearCard({ name: r[0], text: r[3] })}<div class="zt"><div class="label">Gear · ${r[1]} in the deck</div><h3>${esc(r[0])}</h3><p>${esc(r[3])}</p>
       ${mine ? `<button class="primary" data-act="usegear" data-id="${mine.id}" style="margin-top:10px">Use ${esc(a)} now</button>` : why ? `<p class="small">${why}</p>` : ""}</div></div>`;
   }
   if (kind === "event") {
     const r = LT.EVENTS.find(x => x[0] === a); if (!r) return "";
-    return `<div class="zoomview">${eventCard(a)}<div class="zt"><div class="label">Event · ${r[1]} in the deck</div><h3>${esc(a)}</h3><p>${esc(r[2])}</p><p class="small">On the final leg, an Event that removes a dog removes 2.</p></div></div>`;
+    return `<div class="zoomview">${eventCard(a)}<div class="zt"><div class="label">Event · ${r[1]} in the deck</div><h3>${esc(a)}</h3><p>${esc(r[2])}</p><p class="small">On the final leg, an Event that drops a dog drops 2.</p></div></div>`;
   }
   if (kind === "musher") {
     const t = LT.MUSHERS[a];
@@ -2226,7 +2226,7 @@ function rulesHTML() {
   const gen = mode === "generous";
   const fl = [];
   if (!rules.noStorm) fl.push("<b>Storm:</b> start your turn on a final-leg trail, draw an Event.");
-  if (!rules.noHarsh) fl.push("<b>Harsh weather:</b> Events that remove a dog remove 2.");
+  if (!rules.noHarsh) fl.push("<b>Harsh weather:</b> Events that drop a dog drop 2.");
   if (!rules.noPushPerDog) fl.push("<b>No easy pushing:</b> each pushed tired dog draws an Event.");
   return `<h3>Long Trail · quick rules</h3>
   <p class="small">This race: ${legs.join("-")} trails${rules.lineMax ? ` · ${rules.lineMax}-dog gangline` : ""} · ${gen ? "well-stocked" : "standard"} checkpoints.</p>
@@ -2243,7 +2243,7 @@ function rulesHTML() {
     <li>Long Rest (exactly once, either checkpoint, required before passing Checkpoint 2): dogs and used gear back, ${gen ? "draw 3 dogs keep 2" : "draw 2 dogs keep 1"}, draw 2 gear keep 1, skip your next turn, then flip your musher.</li></ul></details>
   <details class="rules"><summary>Final leg and Events</summary><ul>
     ${fl.length ? fl.map(x => `<li>${x}</li>`).join("") : "<li>No extra final-leg weather in this race.</li>"}
-    <li>Removed dogs must be tired or exhausted if you have any. No dogs left: you're scratched.</li>
+    <li>Dropped dogs must be tired or exhausted if you have any. No dogs left: you're scratched.</li>
     <li>The Finish has Difficulty 2. First musher there wins.</li></ul></details>
   <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
 }
@@ -2471,7 +2471,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 11:28 AM";
+const LT_BUILD = "Oct 15, 11:30 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
