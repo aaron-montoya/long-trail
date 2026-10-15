@@ -802,7 +802,7 @@ const LT = (() => {
       this.stats.removed++;
       this.log(`${v.name} heads home to rest by the fire (${cause}).`, "bad");
       if (!p.dogs.length) {
-        p.scratched = true;
+        p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
         this.log(`${p.name} has no dogs left and is scratched.`, "bad");
       }
       this.upd();
@@ -985,7 +985,7 @@ const LT = (() => {
       for (const d of out) { p.dogs.splice(p.dogs.indexOf(d), 1); d.state = "removed"; p.lost.push(d); this.stats.removed++; }
       if (out.length) this.log(`Vet check at Checkpoint 2: ${out.map(d => d.name).join(", ")} ${out.length > 1 ? "are" : "is"} too worn out and head${out.length > 1 ? "" : "s"} home.`, "bad");
       else this.log(`Vet check at Checkpoint 2: ${p.name}'s team passes.`, "good");
-      if (!p.dogs.length) { p.scratched = true; this.log(`${p.name} has no dogs left and is scratched.`, "bad"); }
+      if (!p.dogs.length) { p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round; this.log(`${p.name} has no dogs left and is scratched.`, "bad"); }
       this.upd();
       await this.tell(p, { type: "vetCheck", cards: out, scratched: p.scratched });
     }
@@ -1521,6 +1521,7 @@ function resetToStandard() {
 // Settings saved before the new standard used old names/defaults: move everyone onto the new standard once.
 if (store.get("settingsVer", 1) < 2) { resetToStandard(); store.set("settingsVer", 2); }
 if (S.mode === "lean") { S.mode = "standard"; store.set("mode", S.mode); }
+if (S.rules.finalRunMax) { delete S.rules.finalRunMax; store.set("rules", S.rules); }
 const humans = () => S.game ? S.game.players.filter(p => !p.bot) : [];
 
 // ---------------- Game IO ----------------
@@ -1637,7 +1638,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 11:04 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 11:10 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1670,7 +1671,6 @@ function renderSetup() {
       <div class="modes">
         <label><span style="flex:none"><select id="rule-line"><option value="0" ${!S.rules.lineMax ? "selected" : ""}>No limit</option><option value="7" ${S.rules.lineMax == 7 ? "selected" : ""}>7 dogs</option><option value="6" ${S.rules.lineMax == 6 ? "selected" : ""}>6 dogs (standard)</option><option value="5" ${S.rules.lineMax == 5 ? "selected" : ""}>5 dogs</option></select></span><span><b>Gangline limit</b><small>The most dogs you can run in one line.</small></span></label>
         <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is sent home.</small></span></label>
-        <label><input type="checkbox" id="rule-cap" ${S.rules.finalRunMax ? "checked" : ""}> <span><b>Whiteout pace</b><small>On the final leg, a Run can cross at most 3 cards (the Finish counts). No crossing the whole final leg in one turn.</small></span></label>
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
       <div class="opts" style="margin-top:12px">
@@ -1742,7 +1742,7 @@ function renderGame(full) {
     renderLog(true);
   }
   const cur = g.current;
-  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.finalRunMax ? `<span class="chip">Whiteout pace</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
+  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
   renderStrip();
   $("#players").innerHTML = g.players.map(p => `
     <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
@@ -2008,7 +2008,7 @@ function runPanelHTML(p) {
     const pv = pr.pv;
     let where;
     if (pv.finished) where = `<b>Reaches the Finish and wins!</b>`;
-    else if (pv.crossed) where = `Reaches <b>${esc(g.label(pv.end))}</b> with ${pv.left} Speed left${pv.capped ? ` (Whiteout pace: ${g.rules.finalRunMax} final-leg cards per Run)` : pv.hiddenNext ? " for the face-down trail ahead" : ""}.`;
+    else if (pv.crossed) where = `Reaches <b>${esc(g.label(pv.end))}</b> with ${pv.left} Speed left${pv.hiddenNext ? " for the face-down trail ahead" : ""}.`;
     else where = `<b style="color:var(--bad)">Can't pay for the next trail${pv.tankBlock ? " (Tank won't step onto River Ice)" : ""}.</b>`;
     const pushed = pr.line.filter(x => x.st === "tired").length;
     const booties = pr.gear.some(x => x.name === "Booties");
@@ -2227,7 +2227,6 @@ function rulesHTML() {
   if (!rules.noStorm) fl.push("<b>Storm:</b> start your turn on a final-leg trail, draw an Event.");
   if (!rules.noHarsh) fl.push("<b>Harsh weather:</b> Events that remove a dog remove 2.");
   if (!rules.noPushPerDog) fl.push("<b>No easy pushing:</b> each pushed tired dog draws an Event.");
-  if (rules.finalRunMax) fl.push(`<b>Whiteout pace:</b> a Run can cross at most ${rules.finalRunMax} final-leg cards (the Finish counts).`);
   return `<h3>Long Trail · quick rules</h3>
   <p class="small">This race: ${legs.join("-")} trails${rules.lineMax ? ` · ${rules.lineMax}-dog gangline` : ""} · ${gen ? "well-stocked" : "standard"} checkpoints.</p>
   <details class="rules" open><summary>Your turn: Run, Slog or Camp</summary><ul>
@@ -2338,7 +2337,6 @@ document.addEventListener("change", async e => {
   if (t.id === "rule-storm") { if (t.checked) delete S.rules.noStorm; else S.rules.noStorm = true; store.set("rules", S.rules); }
   if (t.id === "rule-harsh") { if (t.checked) delete S.rules.noHarsh; else S.rules.noHarsh = true; store.set("rules", S.rules); }
   if (t.id === "rule-push") { if (t.checked) delete S.rules.noPushPerDog; else S.rules.noPushPerDog = true; store.set("rules", S.rules); }
-  if (t.id === "rule-cap") { if (t.checked) S.rules.finalRunMax = 3; else delete S.rules.finalRunMax; store.set("rules", S.rules); }
   if (t.id === "rule-vet") { if (t.checked) S.rules.vetCheck = true; else delete S.rules.vetCheck; store.set("rules", S.rules); }
   if (t.id === "rule-big") { if (t.checked) S.rules.bigLine = 5; else delete S.rules.bigLine; store.set("rules", S.rules); }
   if (S.screen === "setup" && (t.name === "mode" || /^rule-/.test(t.id || ""))) { renderSetup(); return; }
@@ -2472,7 +2470,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 11:04 AM";
+const LT_BUILD = "Oct 15, 11:10 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
