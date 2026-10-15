@@ -367,7 +367,7 @@ const LT = (() => {
     ["Mitts", "Team", 2, 2, "mitts", "+2 if directly behind a Lead dog."],
     ["Echo", "Team", 2, 2, "echo", "+2 if no tired dogs run."],
     ["Northstar", "Team", 2, 3, "northstar", "", "After running tired, Northstar returns to your hand instead of becoming exhausted."],
-    ["Flash", "Team", 4, 3, "fragile", "If an Event drops a dog while Flash is tired or exhausted, drop Flash."],
+    ["Flash", "Team", 4, 3, "fragile", "", "If an Event drops a dog while Flash is tired or exhausted, drop Flash."],
     ["Jim Bucket", "Team", 1, 2, "packer", "+1 for each other dog in line."],
     ["Ranger", "Team", 2, 3, "scavenger", "If Ranger runs and you take a trail reward, also take the top Gear card.", "If Ranger runs tired, you can't take a trail reward this Run."],
     ["Cocoa", "Team", 2, 2, "cocoa", "While Cocoa is in your hand, camping in the open also returns one used gear."],
@@ -1797,7 +1797,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 5:27 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 5:54 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2645,7 +2645,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 5:27 PM";
+const LT_BUILD = "Oct 15, 5:54 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
