@@ -244,6 +244,51 @@ button.ghost { background: transparent; }
 .times { border-collapse: collapse; font-size: 14px; margin: 6px 0; }
 .times th, .times td { text-align: left; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .times th { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.menubtn { display: none; }
+.mobilebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 6px; align-items: center;
+  padding: 8px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
+  background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 14px rgba(0,0,0,.18); }
+.mobilebar button { flex: 1 1 0; padding: 11px 6px; font-weight: 700; font-size: 15px; }
+.mobilebar .mbsum { flex: 2 1 0; display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.mobilebar .mbsum b { font-family: Bitter, serif; font-size: 20px; color: var(--fg); }
+.mobilebar .mbsum b.ok { color: var(--good); } .mobilebar .mbsum b.short { color: var(--bad); }
+.mobilebar .mbv { font-weight: 700; font-size: 12.5px; }
+.mobilebar .mbv .ok { color: var(--good); } .mobilebar .mbv .short { color: var(--bad); }
+@media (max-width: 700px) {
+  body.hasbar { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { padding-block: 8px 24px; }
+  .top { gap: 6px 10px; margin-bottom: 8px; }
+  .top h1 { font-size: 19px; }
+  .top .meta { font-size: 12.5px; gap: 4px 10px; order: 3; flex-basis: 100%; }
+  .top .tools { gap: 4px; }
+  .top .tools .opt { display: none; }
+  .top.showtools .tools .opt { display: inline-flex; }
+  .top.showtools .tools { flex-wrap: wrap; }
+  .menubtn { display: inline-block; }
+  .clock b { font-size: 16px; }
+  .stripbox { padding: 6px; border-radius: 10px; }
+  .slotlab { font-size: 10.5px; }
+  .players { display: flex; overflow-x: auto; gap: 6px; scroll-snap-type: x proximity; margin: 8px 0; padding-bottom: 2px; }
+  .players .pl { flex: 0 0 auto; width: min(78vw, 260px); scroll-snap-align: start; padding: 6px 8px; }
+  .players .pl .last { display: none; }
+  .players .pl .nm b { font-size: 15px; }
+  .chip { font-size: 11.5px; }
+  .board, .runpanel, .logbox { padding: 10px; border-radius: 10px; }
+  .musherrow { gap: 10px; }
+  .board .musherrow > .card { --w: 74px; }
+  .mtext { font-size: 13px; }
+  .mtext .side { padding: 4px 6px; }
+  .mtext .side.off { display: none; }
+  .tableau:has(> .empty) { display: none; }
+  .tableau { padding: 6px; gap: 8px; }
+  .tableau .row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .hand { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x proximity; gap: 8px; padding: 4px 2px 8px; }
+  .hc { scroll-snap-align: start; }
+  .hc:hover, .hc:focus-within { transform: none; }
+  .runpanel .runbtns .primary, .runpanel .runbtns [data-act=cancelrun] { display: none; }
+  .summary .big { font-size: 34px; }
+  .acts .act span { font-size: 12px; }
+}
 /* modal */
 .scrim { position: fixed; inset: 0; background: rgba(10,16,22,.55); display: grid; place-items: center; z-index: 50; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .modal { background: var(--panel); color: var(--fg); border-radius: 14px; padding: 18px; max-width: 760px; width: 100%; max-height: 100%; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
@@ -1656,17 +1701,19 @@ function renderGame(full) {
         <div class="tools">
           <span class="clock" title="Race time (paused time doesn't count)">⏱ <b id="clock">0:00</b></span>
           <button id="pausebtn" data-act="pause">Pause</button>
-          <select id="botspeed2" aria-label="Bot speed">${[[1400, "Bots: slow"], [700, "Bots: normal"], [250, "Bots: fast"], [0, "Bots: instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}</select>
-          <span class="seg sizer" role="group" aria-label="Card size">${["S", "M", "L"].map(v => `<button data-act="size" data-v="${v}" class="${(S.cardSize || "M") === v ? "on" : ""}" title="Card size ${v}">${v}</button>`).join("")}</span>
-          <button data-act="rules">Rules</button>
-          <button data-act="newrace">New race</button>
+          <button class="menubtn" data-act="menu" aria-label="More options">☰</button>
+          <select class="opt" id="botspeed2" aria-label="Bot speed">${[[1400, "Bots: slow"], [700, "Bots: normal"], [250, "Bots: fast"], [0, "Bots: instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <span class="seg sizer opt" role="group" aria-label="Card size">${["S", "M", "L"].map(v => `<button data-act="size" data-v="${v}" class="${(S.cardSize || "M") === v ? "on" : ""}" title="Card size ${v}">${v}</button>`).join("")}</span>
+          <button class="opt" data-act="rules">Rules</button>
+          <button class="opt" data-act="newrace">New race</button>
         </div>
       </div>
       <div class="stripbox"><div class="strip" id="strip"></div></div>
       <div class="players" id="players"></div>
       <div class="main"><div class="board" id="board"></div><div class="rail"><div class="runpanel" id="runpanel"></div></div></div>
       <details class="logbox" id="logwrap" ${store.get("logOpen", true) ? "open" : ""}><summary><span class="label">Race log</span><span class="small" id="loglast"></span></summary><div class="log" id="log"></div></details>
-      <div id="modal"></div>`;
+      <div id="modal"></div>
+      <div id="mobilebar" class="mobilebar" hidden></div>`;
     renderLog(true);
   }
   const cur = g.current;
@@ -1679,6 +1726,8 @@ function renderGame(full) {
       ${S.lastAct[p.idx] ? `<div class="last">${esc(S.lastAct[p.idx])}</div>` : ""}
     </div>`).join("");
   renderBoard();
+  buildMobileBar();
+  scrollStripToAction();
   renderModal();
 }
 
@@ -2191,9 +2240,44 @@ function ensureModalHost() { if (!$("#modal")) app.insertAdjacentHTML("beforeend
 const SIZES = { S: [120, 84], M: [150, 96], L: [190, 112] };
 function applySize() {
   const [h, s] = SIZES[S.cardSize] || SIZES.M;
-  document.documentElement.style.setProperty("--handw", `min(${h}px, 40vw)`);
-  document.documentElement.style.setProperty("--stripw", `min(${s}px, 19vw)`);
+  const narrow = window.matchMedia("(max-width: 700px)").matches;
+  const vw = { S: 26, M: 31, L: 40 }[S.cardSize] || 31;
+  document.documentElement.style.setProperty("--handw", narrow ? `min(${h}px, ${vw}vw)` : `min(${h}px, 40vw)`);
+  document.documentElement.style.setProperty("--stripw", narrow ? `min(${s}px, ${vw - 13}vw)` : `min(${s}px, 19vw)`);
 }
+
+const isNarrow = () => window.matchMedia("(max-width: 700px)").matches;
+// Keep the part of the trail where the action is in view on small screens.
+function scrollStripToAction() {
+  const box = $(".stripbox"), g = S.game; if (!box || !g) return;
+  const p = g.current || S.viewer; if (!p) return;
+  const slots = box.querySelectorAll(".slot");
+  const el = slots[Math.max(0, p.pos + 1)]; if (!el) return;
+  const key = g.round + ":" + p.idx + ":" + p.pos;
+  if (box.dataset.k === key) return;
+  box.dataset.k = key;
+  box.scrollLeft = Math.max(0, el.offsetLeft - box.clientWidth * 0.3);
+}
+// Phone: a bar pinned to the bottom with the turn buttons, or need/have + Run! while setting up a Run.
+function buildMobileBar() {
+  const bar = $("#mobilebar"); if (!bar) return;
+  const pd = S.pending, myTurn = pd && pd.req.type === "action" && !pd.p.bot;
+  if (!isNarrow() || !myTurn) { bar.hidden = true; document.body.classList.remove("hasbar"); return; }
+  let html = "";
+  if (S.run) {
+    const need = $(".summary .vs .col:first-child .big"), have = $(".summary .vs .col:nth-child(2) .big"), verdict = $(".summary .verdict");
+    const go = $("#runpanel [data-act=go]");
+    html = `<div class="mbsum"><span>Need <b>${need ? need.textContent : "–"}</b></span><span>Have <b class="${have ? have.className.replace("big", "") : ""}">${have ? have.textContent : "–"}</b></span><span class="mbv">${verdict ? verdict.innerHTML : ""}</span></div>
+      <button data-act="cancelrun">Back</button><button class="primary" data-act="go" ${go && !go.disabled ? "" : "disabled"}>Run!</button>`;
+  } else {
+    const btns = [...document.querySelectorAll("#runpanel .acts > button.act")].filter(b => ["run", "slog", "camp", "cpcamp", "longrest"].includes(b.dataset.act));
+    html = btns.map(b => `<button class="${b.classList.contains("primary") ? "primary" : ""}" data-act="${b.dataset.act}" ${b.disabled ? "disabled" : ""}>${b.querySelector("b").textContent}</button>`).join("");
+  }
+  bar.innerHTML = html;
+  bar.hidden = !html;
+  document.body.classList.toggle("hasbar", !!html);
+}
+window.addEventListener("resize", () => { if (S.screen === "game" && S.game) { applySize(); renderGame(); } });
 
 // ---------------- Events ----------------
 document.addEventListener("input", e => {
@@ -2243,6 +2327,7 @@ document.addEventListener("click", e => {
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
     // game header
+    case "menu": { const t = $(".top"); if (t) t.classList.toggle("showtools"); break; }
     case "rules": S.overlay = { type: "rules" }; renderModal(); break;
     case "newrace": S.game = null; S.pending = null; S.overlay = null; S.screen = "setup"; render(); break;
     case "rematch": { S.overlay = null; startGame(); break; }
