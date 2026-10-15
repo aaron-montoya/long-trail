@@ -352,36 +352,36 @@ details.rules ul { padding-left: 18px; margin: 6px 0; font-size: 14px; max-width
 const LT = (() => {
   // ---------------- Card data ----------------
   const DOGS = [
-    // name, role, rested, tired, ability key, text
+    // name, role, rested, tired, ability key, rested text, tired text (printed on the tired half: works while tired or exhausted)
     ["Willow", "Lead", 2, 3, null, ""],
-    ["Comet", "Lead", 2, 2, "comet", "Her Lead bonus is +2."],
+    ["Comet", "Lead", 2, 2, "comet", "Comet's Lead bonus is +2.", "Comet's Lead bonus is +2."],
     ["Scout", "Lead", 1, 2, "scout", "When Scout runs first, look at the next face-down trail."],
-    ["Alpine", "Lead", 1, 1, "ignore1", "When Alpine runs, ignore the first Event you draw this turn."],
+    ["Alpine", "Lead", 1, 0, "ignore1", "When Alpine runs, you may ignore one Event you draw this turn.", "When Alpine runs, you may ignore one Event you draw this turn."],
     ["Nanook", "Lead", 2, 2, "nanook", "When Nanook runs, Spruce Forest and Exposed Ridge have 1 less Difficulty."],
-    ["Kestrel", "Lead", 3, 2, "flighty", "Her Lead bonus counts only if 3 or more dogs run."],
-    ["Birch", "Lead", 1, 2, "birch", "If Birch runs first, the second dog in line gets +2."],
-    ["Aurora", "Lead", 3, 3, "ignore1", "When Aurora runs, ignore the first Event you draw this turn."],
-    ["Bramble", "Team", 2, 3, null, ""],
+    ["Kestrel", "Lead", 4, 1, "snowfield", "When Kestrel runs, Snowfield has 1 less Difficulty."],
+    ["Birch", "Lead", 1, 2, "birch", "When Birch runs first, the second dog in line gets +2."],
+    ["Aurora", "Lead", 3, 2, "aurora", "On final leg Trails, Aurora gets +2."],
+    ["Bramble", "Team", 2, 5, "bramble", "", "After running tired, Bramble is dropped."],
     ["Ember", "Team", 3, 2, null, ""],
-    ["Dash", "Team", 3, 1, null, ""],
+    ["Dash", "Team", 4, 1, null, ""],
     ["Mitts", "Team", 2, 2, "mitts", "+2 if directly behind a Lead dog."],
-    ["Echo", "Team", 2, 2, "echo", "+1 for each Team dog ahead of Echo in line."],
-    ["Northstar", "Team", 2, 3, "tireless", "After running rested, Northstar returns to your hand instead of becoming tired."],
-    ["Flash", "Team", 4, 2, "fragile", "If an Event drops a dog while Flash is tired or exhausted, drop Flash."],
-    ["Tundra", "Team", 1, 2, "packer", "+1 speed for each other dog in line."],
-    ["Ranger", "Team", 2, 2, "scavenger", "If Ranger runs onto a reward trail, also take the top Gear card."],
-    ["Cocoa", "Team", 2, 2, "cocoa", "While Cocoa is in your hand, when you camp in the open, draw 2 Events and choose 1."],
+    ["Echo", "Team", 2, 2, "echo", "+2 if no tired dogs run."],
+    ["Northstar", "Team", 2, 3, "northstar", "", "After running tired, Northstar returns to your hand instead of becoming exhausted."],
+    ["Flash", "Team", 4, 3, "fragile", "If an Event drops a dog while Flash is tired or exhausted, drop Flash."],
+    ["Jim Bucket", "Team", 1, 2, "packer", "+1 for each other dog in line."],
+    ["Ranger", "Team", 2, 3, "scavenger", "If Ranger runs and you take a trail reward, also take the top Gear card.", "If Ranger runs tired, you can't take a trail reward this Run."],
+    ["Cocoa", "Team", 2, 2, "cocoa", "While Cocoa is in your hand, camping in the open also returns one used gear."],
     ["Tinker", "Team", 1, 2, "tinker", "When Tinker runs, return one used gear to your hand."],
-    ["Ollie", "Team", 1, 2, "underdog", "+2 if you have fewer dogs than every other musher."],
-    ["Shadow", "Team", 3, 3, "shadow", "River Ice and Exposed Ridge never make you draw Events."],
+    ["Ollie", "Team", 1, 2, "underdog", "+2 if another musher is ahead of you."],
+    ["Shadow", "Team", 3, 2, "shadow", "River Ice and Exposed Ridge never make you draw Events."],
     ["Bear", "Wheel", 3, 2, null, ""],
     ["Old Ben", "Wheel", 2, 3, null, ""],
-    ["Tank", "Wheel", 3, 3, "heavy", "If Tank runs, you can't move onto River Ice this Run."],
-    ["Anvil", "Wheel", 2, 2, "anvil", "+1 if 4 or more dogs run."],
-    ["Brick", "Wheel", 1, 3, null, ""],
-    ["Yukon", "Wheel", 3, 3, "lastonly", "Must run last in line."],
-    ["Huckle", "Wheel", 2, 2, "rearguard", "While Huckle is in your hand, Squirrel! and Moose on the Trail have no effect on you."],
-    ["Boulder", "Wheel", 4, 3, "hardy", "The first time a Wheel dog would be dropped each race, he becomes exhausted instead."],
+    ["Tank", "Wheel", 3, 3, "heavy", "If Tank runs, you can't move onto River Ice this Run.", "If Tank runs, you can't move onto River Ice this Run."],
+    ["Anvil", "Wheel", 2, 2, "anvil", "+2 if 4 or more dogs run."],
+    ["Brick", "Wheel", 1, 4, null, ""],
+    ["Yukon", "Wheel", 2, 2, "yukon", "Yukon's Wheel bonus is +2.", "Yukon's Wheel bonus is +2."],
+    ["Huckle", "Wheel", 2, 2, "hardy", "", "The first time Huckle would be dropped each race, he becomes exhausted instead."],
+    ["Boulder", "Wheel", 4, 3, "anchor", "While Boulder is in your hand, Events can't move you back a trail."],
   ];
 
   const GEAR = [
@@ -498,7 +498,7 @@ const LT = (() => {
       this.path.push({ id: nid("f"), type: "F", cost: FINISH_COST });
       this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
 
-      this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], state: "rested", hardyUsed: false })));
+      this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], tt: d[6] || "", state: "rested", hardyUsed: false })));
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
       this.eventDeck = this.shuffle(EVENTS.flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
       this.eventDiscard = [];
@@ -602,8 +602,7 @@ const LT = (() => {
       const f = line[0];
       if (f.dog.role !== "Lead") return 0; // roles count rested or tired; abilities only when rested
       if (line.length < 2) return 0; // a Lead needs at least one dog behind it
-      let b = f.st === "rested" && f.dog.ab === "comet" ? 2 : 1;
-      if (f.st === "rested" && f.dog.ab === "flighty" && line.length < 3) b = 0;
+      let b = f.dog.ab === "comet" && (f.st === "rested" || f.dog.tt) ? 2 : 1;
       if (b && p.musher === "Champion" && !p.after) b += 1;
       if (gearSel.some(g => g.name === "Golden Harness")) b *= 2;
       return b;
@@ -617,18 +616,17 @@ const LT = (() => {
         if (x.st === "tired") { add(d.ts, `${d.name} (tired)`); return; }
         let v = d.rs;
         if (d.ab === "mitts" && i > 0 && line[i - 1].dog.role === "Lead") v += 2;
-        if (d.ab === "echo") v += line.slice(0, i).filter(y => y.dog.role === "Team").length;
+        if (d.ab === "echo" && !line.some(y => y.st === "tired")) v += 2;
         if (d.ab === "packer") v += line.length - 1;
-        if (d.ab === "anvil" && line.length >= 4) v += 1;
-        if (d.ab === "underdog") {
-          const others = this.players.filter(q => q !== p && !q.scratched);
-          if (others.length && others.every(q => p.dogs.length < q.dogs.length)) v += 2;
-        }
+        if (d.ab === "anvil" && line.length >= 4) v += 2;
+        if (d.ab === "underdog" && this.players.some(q => q !== p && !q.scratched && q.pos > p.pos)) v += 2;
         if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
+        if (d.ab === "aurora" && p.pos >= 0 && this.finalLeg(p.pos)) v += 2;
         add(v, d.name);
       });
       add(this.leadBonus(p, line, gearSel), "Lead bonus");
-      if (line.length && line[line.length - 1].dog.role === "Wheel" && line.length >= 2) add(1, "Wheel bonus"); // a Wheel needs at least one dog ahead of it
+      const w = line[line.length - 1];
+      if (w && w.dog.role === "Wheel" && line.length >= 2) add(w.dog.ab === "yukon" ? 2 : 1, "Wheel bonus"); // a Wheel needs at least one dog ahead of it; Yukon's +2 is printed on both halves
       const m = p.musher, af = p.after;
       if (m === "Sprinter") add(af ? 1 : 2, "Sprinter");
       if (m === "Champion" && af) add(2, "Champion");
@@ -651,6 +649,7 @@ const LT = (() => {
       const rl = line.filter(x => x.st === "rested").map(x => x.dog);
       if (c.name === "Mountain Pass") cost -= rl.filter(d => d.role === "Wheel").reduce((s, d) => s + d.rs, 0);
       if (rl.some(d => d.ab === "nanook") && (c.name === "Spruce Forest" || c.name === "Exposed Ridge")) cost -= 1;
+      if (rl.some(d => d.ab === "snowfield") && c.name === "Snowfield") cost -= 1;
       if (p.musher === "Veteran" && p.after && this.finalLeg(i)) cost -= 1;
       cost += p.costMod;
       cost = Math.max(1, cost);
@@ -668,7 +667,7 @@ const LT = (() => {
       const known = opts.known !== false;
       const sp = this.speedOf(p, line, gearSel);
       let pool = sp.total, pos = p.pos, crossed = 0, finished = false, unknownHit = false, hiddenNext = false, tankBlock = false, capped = false, finalCount = 0;
-      const heavy = line.some(x => x.st === "rested" && x.dog.ab === "heavy");
+      const heavy = line.some(x => x.dog.ab === "heavy");
       const steps = [];
       while (true) {
         const nxt = pos + 1;
@@ -722,10 +721,10 @@ const LT = (() => {
         e = this.drawEvent();
         this.log(`${p.name} draws an Event (${source}): ${e}.`, "ev");
       }
-      if (p.ignoreLeft > 0) {
+      if (p.ignoreLeft > 0 && await this.ask(p, { type: "alpineIgnore", card: e, source })) {
         p.ignoreLeft--;
-        this.log(`${p.name}'s lead dog shrugs it off: ${e} is ignored.`, "good");
-        await this.tell(p, { type: "event", card: e, source, ignored: "Your lead dog (Alpine or Aurora) ignores this Event." });
+        this.log(`${p.name}'s Alpine shrugs it off: ${e} is ignored.`, "good");
+        await this.tell(p, { type: "event", card: e, source, ignored: "Alpine ignores this Event." });
         return;
       }
       if (p.musher === "Rookie" && !p.after) {
@@ -746,7 +745,7 @@ const LT = (() => {
     async applyEvent(p, e) {
       const harsh = this.finalLeg(p.pos) && !this.rules.noHarsh;
       const n = harsh ? 2 : 1;
-      const huckle = p.dogs.some(d => d.ab === "rearguard" && d.state === "rested");
+      const huckle = false; // (no dog stops Squirrel! or the moose any more)
       switch (e) {
         case "Northern Lights": p.runBonus += 2; p.keptEvents.push(e); break;
         case "Tailwind": p.runBonus += 1; p.keptEvents.push(e); break;
@@ -795,6 +794,8 @@ const LT = (() => {
     }
     moveBack(p) {
       if (p.pos < 0) return;
+      const anchor = p.dogs.find(d => d.ab === "anchor" && d.state === "rested");
+      if (anchor) { this.log(`${anchor.name} digs in. ${p.name} doesn't move back.`, "good"); return; }
       if (p.pos === 0) { p.pos = -1; this.log(`${p.name} is pushed back to the start.`, "bad"); return; }
       if (this.path[p.pos].type === "CP" || this.path[p.pos - 1].type === "CP") return;
       p.pos -= 1;
@@ -810,9 +811,14 @@ const LT = (() => {
       if (!pool.length) return;
       const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: p.dogs.map(d => d.id), cause, reason, k, n });
       const v = pool.find(d => d.id === id) || pool[0];
-      if (v.ab === "hardy" && !v.hardyUsed) {
+      await this.dropDog(p, v, cause);
+    }
+    // Drop one particular dog (Huckle and the Sled Basket can still save it)
+    async dropDog(p, v, cause) {
+      if (p.scratched || !p.dogs.includes(v)) return;
+      if (v.ab === "hardy" && !v.hardyUsed && v.state !== "rested") {
         v.hardyUsed = true; v.state = "exh";
-        this.log(`${v.name} is Hardy and only gets exhausted (${cause}).`, "good");
+        this.log(`${v.name} toughs it out and is only exhausted (${cause}).`, "good");
         return;
       }
       const basket = p.gear.find(g => g.name === "Sled Basket");
@@ -861,6 +867,7 @@ const LT = (() => {
     async claim(p, line, at = p.pos) {
       const c = this.path[at];
       if (!c || c.type !== "T" || !c.reward) return;
+      if (line.some(x => x.st === "tired" && x.dog.ab === "scavenger")) { this.log(`Tired Ranger wanders off. ${p.name} can't take the trail reward.`, "bad"); return; }
       const { kind, card } = c.reward;
       c.reward = null;
       if (kind === "dog") { card.state = "rested"; p.dogs.push(card); }
@@ -929,9 +936,9 @@ const LT = (() => {
       const gearSel = (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean);
       const sp = this.speedOf(p, line, gearSel);
       const pushed = line.filter(x => x.st === "tired");
-      if (line.some(x => x.st === "rested" && x.dog.ab === "ignore1")) p.ignoreLeft = 1;
+      if (line.some(x => x.dog.ab === "ignore1" && (x.st === "rested" || x.dog.tt))) p.ignoreLeft = 1;
       p.shadowTurn = line.some(x => x.st === "rested" && x.dog.ab === "shadow");
-      const heavy = line.some(x => x.st === "rested" && x.dog.ab === "heavy");
+      const heavy = line.some(x => x.dog.ab === "heavy");
       // spend gear
       for (const g of gearSel) { p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g); }
       this.log(`${p.name} runs ${line.map(x => x.dog.name + (x.st === "tired" ? " (tired)" : "")).join(", ")}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}: Speed ${sp.total}.`, "act");
@@ -992,9 +999,13 @@ const LT = (() => {
       p.runBonus = 0; p.costMod = 0; p.keptEvents = []; p.campedLast = false;
       for (const x of line) {
         if (!p.dogs.includes(x.dog)) continue;
-        if (x.st === "rested") { if (x.dog.ab !== "tireless") x.dog.state = "tired"; }
-        else if (x.st === "tired") x.dog.state = "exh";
+        if (x.st === "rested") x.dog.state = "tired";
+        else if (x.st === "tired") {
+          if (x.dog.ab === "northstar") { x.dog.state = "rested"; this.log(`Northstar trots back to ${p.name}'s hand.`, "good"); }
+          else x.dog.state = "exh";
+        }
       }
+      for (const x of line) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
         const opts = p.used.map(g => g.id);
         if (opts.length) {
@@ -1073,12 +1084,17 @@ const LT = (() => {
         const b = p.gear.find(g => g.name === "Bivy Sack");
         if (b) { p.gear.splice(p.gear.indexOf(b), 1); p.used.push(b); safe = "The Bivy Sack keeps everyone warm."; }
       }
+      const cocoa = p.dogs.some(d => d.ab === "cocoa" && d.state === "rested");
       if (safe) this.log(`${safe} No Event.`, "good");
-      else {
-        const cocoa = p.dogs.some(d => d.ab === "cocoa" && d.state === "rested");
-        await this.event(p, "camping in the open", { choose2: cocoa });
-      }
+      else await this.event(p, "camping in the open");
       if (!p.scratched) this.refreshDogs(p);
+      if (!p.scratched && cocoa && p.dogs.some(d => d.ab === "cocoa") && p.used.length) {
+        const opts = p.used.map(g => g.id);
+        const id = await this.ask(p, { type: "tinker", options: opts, source: "Cocoa" });
+        const g = p.used.find(x => x.id === id) || p.used[0];
+        p.used.splice(p.used.indexOf(g), 1); p.gear.push(g);
+        this.log(`Cocoa curls up by the fire. ${g.name} is back in hand.`, "good");
+      }
       this.upd();
     }
 
@@ -1218,10 +1234,10 @@ const LT = (() => {
       const r = dogs.filter(x => x.st === "rested"), t = dogs.filter(x => x.st === "tired");
       const leads = dogs.filter(x => x.dog.role === "Lead");
       const n = dogs.length;
-      const lv = x => x.st !== "rested" ? 1 : (x.dog.ab === "comet" ? 2 : x.dog.ab === "flighty" && n < 3 ? 0 : 1) + (x.dog.ab === "birch" && n >= 2 ? 2 : 0);
+      const lv = x => x.dog.ab === "comet" && (x.st === "rested" || x.dog.tt) ? 2 : x.st !== "rested" ? 1 : 1 + (x.dog.ab === "birch" && n >= 2 ? 2 : 0);
       leads.sort((a, b) => lv(b) - lv(a));
       const first = leads[0] || null;
-      const yukon = r.find(x => x.dog.ab === "lastonly") || null;
+      const yukon = r.find(x => x.dog.ab === "yukon") || null;
       let rest = dogs.filter(x => x !== first && x !== yukon);
       const wheels = rest.filter(x => x.dog.role === "Wheel").sort((a, b) => (b.st === "rested") - (a.st === "rested"));
       const last = yukon || wheels[0] || null;
@@ -1287,7 +1303,8 @@ const LT = (() => {
         const without = rested.filter(x => x !== tank);
         if (Bot.est(g, p, without) > Bot.est(g, p, rested)) rested = without;
       }
-      const tired = g.tired(p).map(d => ({ dog: d, st: "tired" })).sort((a, b) => b.dog.ts - a.dog.ts);
+      // bots only push Bramble when nothing else gets them moving (she's dropped after running tired)
+      const tired = g.tired(p).filter(d => d.ab !== "bramble").map(d => ({ dog: d, st: "tired" })).sort((a, b) => b.dog.ts - a.dog.ts);
       const base = Bot.est(g, p, rested);
       let best = { v: base, line: rested };
       for (let k = 1; k <= tired.length && (!g.rules.lineMax || rested.length + k <= g.rules.lineMax); k++) {
@@ -1321,6 +1338,7 @@ const LT = (() => {
       switch (req.type) {
         case "pickEvent": return HARSH[req.options[0]] <= HARSH[req.options[1]] ? 0 : 1;
         case "rookieIgnore": return HARSH[req.card] >= 4;
+        case "alpineIgnore": return HARSH[req.card] >= 3;
         case "removeDog": return req.options.map(byId).sort((a, b) => (a.rs + a.ts) - (b.rs + b.ts))[0].id;
         case "exhaustDog": return req.options.map(byId).sort((a, b) => a.ts - b.ts)[0].id;
         case "keepDogs": {
@@ -1489,7 +1507,7 @@ function dogCard(d, o = {}) {
   let inner;
   if (url) inner = img(url) + (o.flag ? `<span class="stateflag">${esc(o.flag)}</span>` : "");
   else inner = `<div class="band ${d.role}"></div><div class="ct">${esc(d.name)}</div><div class="cs">${d.role}</div>
-    <div class="cx">${esc(d.text)}</div>
+    <div class="cx">${esc(st === "rested" ? d.text : (d.tt || ""))}</div>
     <div class="dogspeed"><span class="big">${st === "tired" ? d.ts : d.rs}</span><span class="tiredv">${st === "tired" ? "tired · rested " + d.rs : "tired " + d.ts}</span></div>
     ${o.flag ? `<span class="stateflag top">${esc(o.flag)}</span>` : ""}`;
   const order = (o.order ? `<span class="order">${o.order}</span>` : "") + zb(o, `dog|${d.name}|${st}`);
@@ -1779,7 +1797,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 4:19 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 5:27 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2282,6 +2300,10 @@ function renderModal() {
       return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>
         <p class="small">Rookie: once per leg you may ignore an Event.</p>
         <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
+    case "alpineIgnore":
+      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>
+        <p class="small">Alpine ran this turn: you may ignore one Event you draw this turn.</p>
+        <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
     case "removeDog": case "exhaustDog": {
       const ids = r.all || r.options;
       const stateName = d => d.state === "rested" ? "rested" : d.state === "tired" ? "tired" : "exhausted";
@@ -2305,7 +2327,7 @@ function renderModal() {
     case "lostBootie":
       return modal(`<div class="label">${esc(p.name)} · Lost Bootie</div><h3>Choose a gear to lose</h3><div class="cards">${p.gear.map(c => gearCard(c, { pick: true, attrs: `data-act="pick" data-v="${c.id}"` })).join("")}</div>`);
     case "tinker":
-      return modal(`<div class="label">${esc(p.name)} · Tinker</div><h3>Return one used gear to your hand</h3><div class="cards">${p.used.filter(c => r.options.includes(c.id)).map(c => gearCard(c, { pick: true, attrs: `data-act="pick" data-v="${c.id}"` })).join("")}</div>`);
+      return modal(`<div class="label">${esc(p.name)} · ${esc(r.source || "Tinker")}</div><h3>Return one used gear to your hand</h3><div class="cards">${p.used.filter(c => r.options.includes(c.id)).map(c => gearCard(c, { pick: true, attrs: `data-act="pick" data-v="${c.id}"` })).join("")}</div>`);
     case "sledBasket": {
       const d = findDog(r.dog);
       return modal(`<div class="label">${esc(p.name)} · ${esc(r.cause)}</div><h3>Use your Sled Basket?</h3><div class="cards">${dogCard(d, { flat: true })}</div>
@@ -2333,10 +2355,10 @@ function zoomHTML(spec) {
   const [kind, a, b, c] = spec.split("|");
   if (kind === "dog") {
     const r = LT.DOGS.find(x => x[0] === a); if (!r) return "";
-    const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: r[5] };
+    const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: r[5], tt: r[6] || "" };
     return `<div class="zoomview">${dogCard(d, { state: "rested", flat: true })}<div class="zt"><div class="label">${d.role} dog${b && b !== "rested" ? " · " + (b === "exh" ? "exhausted" : b) : ""}</div><h3>${esc(d.name)}</h3>
-      <p>Rested Speed <b>${d.rs}</b> · Tired Speed <b>${d.ts}</b></p>${d.text ? `<p>${esc(d.text)}</p>` : `<p class="small">No ability.</p>`}
-      <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first with at least one dog behind it, rested or tired." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last with at least one dog ahead of it, rested or tired." : "Team: no position bonus."} Abilities only work while the dog is rested.</p></div></div>`;
+      <p>Rested Speed <b>${d.rs}</b> · Tired Speed <b>${d.ts}</b></p>${d.text ? `<p><b>Rested:</b> ${esc(d.text)}</p>` : ""}${d.tt ? `<p><b>Tired:</b> ${esc(d.tt)}</p>` : ""}${!d.text && !d.tt ? `<p class="small">No ability.</p>` : ""}
+      <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first with at least one dog behind it, rested or tired." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last with at least one dog ahead of it, rested or tired." : "Team: no position bonus."} Abilities only work while the dog is rested, unless they're printed on the tired half too.</p></div></div>`;
   }
   if (kind === "gear") {
     const r = LT.GEAR.find(x => x[0] === a); if (!r) return "";
@@ -2376,7 +2398,7 @@ function rulesHTML() {
   return `<h3>Long Trail · quick rules</h3>
   <p class="small">This race: ${legs.join("-")} trails${rules.lineMax ? ` · ${rules.lineMax}-dog gangline` : ""} · ${gen ? "well-stocked" : "standard"} checkpoints.</p>
   <details class="rules" open><summary>Your turn: Run, Slog or Camp</summary><ul>
-    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you)${rules.lineMax ? `, at most ${rules.lineMax} dogs` : ""}. Rested dogs use full Speed, ability and role bonus; tired dogs use tired Speed and role bonus, but not their ability. Lead first +1 and Wheel last +1, as long as at least 2 dogs run.</li>
+    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you)${rules.lineMax ? `, at most ${rules.lineMax} dogs` : ""}. Rested dogs use full Speed, ability and role bonus; tired dogs use tired Speed, role bonus and any ability printed on their tired half. Lead first +1 and Wheel last +1, as long as at least 2 dogs run.</li>
     <li>To move onto a trail, your Speed must cover its Difficulty; spend that much and keep going while you can. Drafting: a trail's Difficulty is 1 less if another musher is on or past it (Deep Powder: 3 less).</li>
     <li>After a Run, rested dogs that ran become tired, tired ones become exhausted. Then draw any River Ice Event, then draw 1 Event for each tired dog you pushed.</li>
     <li>If your Run ends on a trail with a reward (or stops at a checkpoint right after one), take it.</li>
@@ -2623,7 +2645,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 4:19 PM";
+const LT_BUILD = "Oct 15, 5:27 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
