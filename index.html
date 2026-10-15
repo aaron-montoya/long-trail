@@ -309,6 +309,13 @@ html.phone .acts .act span { font-size: 12px; }
 .mvseat { display: flex; flex-direction: column; gap: 2px; }
 .mvseat button { padding: 0 7px; font-size: 11px; line-height: 16px; }
 .seat { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) auto minmax(0, 170px) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
+.seat .keptline { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.seat .keptline .ghost { padding: 1px 8px; font-size: 12px; }
+.carry { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.carryrow { margin-top: 8px; }
+.cards.mini { --handw: 78px; }
+.cards.mini .card { --w: 78px; }
+.cards.mini .zoomb { display: none; }
 .seat input, .seat select, .opts select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; width: 100%; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg button { border: none; border-radius: 0; padding: 6px 12px; background: var(--bg); }
@@ -488,7 +495,7 @@ const LT = (() => {
 
       this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], state: "rested", hardyUsed: false })));
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
-      this.eventDeck = this.shuffle(EVENTS.flatMap(e => Array.from({ length: e[1] }, () => e[0])));
+      this.eventDeck = this.shuffle(EVENTS.flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
       this.eventDiscard = [];
 
       const pool = this.shuffle(MUSHER_NAMES.slice());
@@ -502,11 +509,26 @@ const LT = (() => {
           shadowTurn: false, turns: 0 };
       });
       this.players.forEach(p => { if (!p.musher) p.musher = pool.pop(); });
+      // Carry-over: kept cards come out of the decks before anything is dealt.
+      opts.players.forEach((pd, i) => {
+        const p = this.players[i], k = pd.kept || {};
+        p.keptStart = [];
+        for (const n of (k.dogs || []).slice(0, 3)) {
+          const j = this.dogDeck.findIndex(d => d.name === n);
+          if (j >= 0) { const d = this.dogDeck.splice(j, 1)[0]; p.dogs.push(d); p.keptStart.push(d.name); }
+        }
+        for (const n of (k.gear || []).slice(0, 1)) {
+          const j = this.gearDeck.findIndex(g => g.name === n);
+          if (j >= 0) { const g = this.gearDeck.splice(j, 1)[0]; p.gear.push(g); p.keptStart.push(g.name); }
+        }
+      });
       this.flip(0);
       this.players.forEach((p, i) => {
-        for (let j = 0; j < 3; j++) p.dogs.push(this.dogDeck.pop());
-        for (let j = 0; j < 1 + (opts.seatGear ? (opts.seatGear[i] || 0) : i); j++) if (this.gearDeck.length) p.gear.push(this.gearDeck.pop());
+        while (p.dogs.length < (opts.startDogs || 3)) p.dogs.push(this.dogDeck.pop());
+        const base = p.gear.length ? 0 : 1;
+        for (let j = 0; j < base + (opts.seatGear ? (opts.seatGear[i] || 0) : i); j++) if (this.gearDeck.length) p.gear.push(this.gearDeck.pop());
       });
+      this.players.forEach(p => { if (p.keptStart.length) this.log(`${p.name} starts with kept cards: ${p.keptStart.join(", ")}.`, "good"); });
     }
 
     shuffle(a) {
@@ -723,7 +745,7 @@ const LT = (() => {
         case "Northern Lights": p.runBonus += 2; p.keptEvents.push(e); break;
         case "Tailwind": p.runBonus += 1; p.keptEvents.push(e); break;
         case "Fresh Snow": p.costMod += 1; p.keptEvents.push(e); break;
-        case "Bitter Cold": for (let i = 0; i < n; i++) await this.removeDog(p, true, e, i + 1, n); break;
+        case "Bitter Cold": for (let i = 0; i < (this.rules.harshCold && this.finalLeg(p.pos) ? 2 : n); i++) await this.removeDog(p, true, e, i + 1, n); break;
         case "Blizzard":
           for (let i = 0; i < n; i++) await this.removeDog(p, true, e, i + 1, n);
           if (!p.scratched) this.moveBack(p);
@@ -973,7 +995,7 @@ const LT = (() => {
         if (gearSel.some(g => g.name === "Booties")) {
           this.log(`Booties protect the pushed dogs. No Event.`, "good");
         } else {
-          const k = this.finalLeg(p.pos) && !this.rules.noPushPerDog ? pushed.length : 1;
+          const k = this.rules.pushPerDogAll || (this.finalLeg(p.pos) && !this.rules.noPushPerDog) ? pushed.length : 1;
           for (let i = 0; i < k && !p.scratched; i++) await this.event(p, "pushing tired dogs");
         }
       }
@@ -1603,7 +1625,7 @@ function resolvePending(v) {
 }
 
 async function startGame(seed) {
-  const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i] }));
+  const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
   store.set("seats", S.seats);
   const io = makeIO();
   S.game = new LT.Game({ players: seats, io, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice() });
@@ -1615,7 +1637,54 @@ async function startGame(seed) {
   render();
   const g = S.game;
   try { await g.play(); } catch (e) { console.error(e); g.log("Something went wrong: " + e.message, "sys"); }
-  if (S.game === g) { T.stop(); tickClock(); S.overlay = { type: "over" }; renderGame(); }
+  if (S.game === g) { T.stop(); tickClock(); setupCarry(g); S.overlay = { type: "over" }; renderGame(); }
+}
+
+// ---------------- Carry-over ----------------
+// Winner keeps 1 card, every other musher who finished keeps 2, scratched mushers keep nothing. At most 1 gear.
+const dogVal = d => d.rs + 0.5 * d.ts + (d.ab ? 0.5 : 0);
+function setupCarry(g) {
+  S.carry = g.players.map(p => {
+    const allow = p.scratched ? 0 : g.winner === p ? 1 : 2;
+    const seen = new Set();
+    const opts = [...p.dogs.map(d => ({ k: "dog", name: d.name, card: d })),
+      ...[...p.gear, ...p.used].filter(x => !seen.has(x.name) && seen.add(x.name)).map(x => ({ k: "gear", name: x.name, card: x }))];
+    const pick = opts.map((o, j) => j).filter(j => opts[j].k === "dog").sort((a, b) => dogVal(opts[b].card) - dogVal(opts[a].card)).slice(0, allow);
+    const g0 = opts.findIndex(o => o.k === "gear");
+    if (pick.length < allow && g0 >= 0) pick.push(g0);
+    return { allow, opts, pick, why: p.scratched ? "scratched" : g.winner === p ? "winner" : "finished" };
+  });
+  applyCarry();
+}
+function applyCarry() {
+  (S.carry || []).forEach((c, i) => {
+    if (!S.seats[i]) return;
+    const pk = c.pick.map(j => c.opts[j]);
+    S.seats[i].kept = { dogs: pk.filter(o => o.k === "dog").map(o => o.name), gear: pk.filter(o => o.k === "gear").map(o => o.name) };
+  });
+  store.set("seats", S.seats);
+}
+function toggleCarry(i, j) {
+  const c = S.carry && S.carry[i]; if (!c || !c.allow) return;
+  const at = c.pick.indexOf(j);
+  if (at >= 0) c.pick.splice(at, 1);
+  else {
+    if (c.opts[j].k === "gear") c.pick = c.pick.filter(x => c.opts[x].k !== "gear");
+    c.pick.push(j);
+    while (c.pick.length > c.allow) c.pick.shift();
+  }
+  applyCarry();
+}
+function keptText(k) { return k ? [...(k.dogs || []), ...(k.gear || [])].join(", ") : ""; }
+function carryHTML(g) {
+  if (!S.carry) return "";
+  return `<div class="carry"><div class="label">Carry-over to the next race</div>
+    <p class="small">Winner keeps 1 card. Every other musher who finished keeps 2. Scratched mushers keep nothing. At most 1 gear. Tap to change.</p>
+    ${S.carry.map((c, i) => { const p = g.players[i]; return `<div class="carryrow"><div><b style="color:${p.color}">${esc(p.name)}</b> <span class="small">${c.why === "scratched" ? "scratched · keeps nothing" : `${c.why === "winner" ? "winner · keeps 1" : "keeps 2"} · ${c.pick.length}/${c.allow} picked`}</span></div>
+      ${c.allow ? `<div class="cards mini">${c.opts.map((o, j) => o.k === "dog"
+        ? dogCard(o.card, { pick: true, flat: true, state: "rested", sel: c.pick.includes(j), attrs: `data-act="carrypick" data-p="${i}" data-o="${j}"` })
+        : gearCard(o.card, { pick: true, sel: c.pick.includes(j), attrs: `data-act="carrypick" data-p="${i}" data-o="${j}"` })).join("")}</div>` : ""}</div>`; }).join("")}
+  </div>`;
 }
 
 // ---------------- Rendering ----------------
@@ -1635,11 +1704,12 @@ function renderSetup() {
         ${["Random", ...LT.MUSHER_NAMES].map(m => `<option ${m === s.musher ? "selected" : ""}>${m}</option>`).join("")}
       </select>
       <button class="ghost rm" data-act="rmseat" data-i="${i}" ${S.seats.length <= 2 ? "disabled" : ""} aria-label="Remove seat">✕</button>
+      ${keptText(s.kept) ? `<div class="keptline"><span class="small">Kept from last race:</span> <span class="chip">${esc(keptText(s.kept))}</span> <button class="ghost" data-act="clearkept" data-i="${i}" aria-label="Clear kept cards">Clear</button></div>` : ""}
     </div>`).join("");
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 11:34 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 12:15 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1647,7 +1717,8 @@ function renderSetup() {
       <div class="label">Seats, in turn order</div>
       ${seats}
       <div class="row" style="margin-top:10px"><button data-act="addseat" ${S.seats.length >= 4 ? "disabled" : ""}>+ Add a seat</button>
-      <span class="small" style="align-self:center">Later seats start with extra gear: +1, +2, +3.</span></div>
+      <span class="small" style="align-self:center">Later seats start with extra gear: +1, +2, +3.</span>
+      ${S.seats.some(sd => keptText(sd.kept)) ? `<button class="ghost" data-act="clearallkept">Start fresh (clear kept cards)</button>` : ""}</div>
     </div>
     <div class="panel">
       ${(() => { const isStd = S.legs.join("-") === "1-2-4" && S.mode !== "generous" && S.rules.lineMax === 6 && S.rules.noHarsh && !S.rules.noStorm && !S.rules.noPushPerDog && !S.rules.vetCheck && !S.rules.bigLine && !S.rules.finalRunMax && !S.rules.handLimit;
@@ -2109,7 +2180,8 @@ function renderModal() {
         </tbody></table>
         ${g.players.some(p => p.bot) ? `<p class="small">Bot turns count toward the race time at the bot speed you picked. For a table estimate, look at the human per-turn times.</p>` : ""}
         <ul>${g.players.map(p => `<li><b style="color:${p.color}">${esc(p.name)}</b> (${esc(p.musher)}): ${p.scratched ? "scratched" : esc(g.label(p.pos))}, ${p.dogs.length} dogs left${p.lost.length ? `, dropped ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</li>`).join("")}</ul>
-        <div class="btns"><button data-act="closeover">Look at the board</button><button data-act="newrace">New race</button><button class="primary" data-act="rematch">Rematch</button></div>`);
+        ${carryHTML(g)}
+        <div class="btns"><button data-act="closeover">Look at the board</button><button data-act="newrace">Back to setup</button><button class="primary" data-act="rematch">Next race with kept cards</button></div>`);
     }
     if (ov.type === "rules") return modal(rulesHTML());
     if (ov.type === "paused") return modal(`<div class="pass"><div class="label">Race paused</div><div class="who">⏱ ${fmt(T.active())}</div><p class="small">The clock and the bots are stopped.</p><button class="primary" data-act="pause">Resume</button></div>`);
@@ -2245,6 +2317,9 @@ function rulesHTML() {
     ${fl.length ? fl.map(x => `<li>${x}</li>`).join("") : "<li>No extra final-leg weather in this race.</li>"}
     <li>Dropped dogs must be tired or exhausted if you have any. No dogs left: you're scratched.</li>
     <li>The Finish has Difficulty 2. First musher there wins.</li></ul></details>
+  <details class="rules"><summary>Carry-over</summary><ul>
+    <li>After a race the winner keeps 1 card, every other musher who finished keeps 2, and scratched mushers keep nothing. At most 1 gear.</li>
+    <li>Kept cards fill part of your next starting hand of 3 dogs and 1 gear. Kept dogs can still be dropped.</li></ul></details>
   <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
 }
 
@@ -2380,8 +2455,11 @@ document.addEventListener("click", e => {
     case "dismissupd": { const b = $("#updbanner"); if (b) b.remove(); break; }
     case "menu": { const t = $(".top"); if (t) t.classList.toggle("showtools"); break; }
     case "rules": S.overlay = { type: "rules" }; renderModal(); break;
-    case "newrace": S.game = null; S.pending = null; S.overlay = null; S.screen = "setup"; render(); break;
-    case "rematch": { S.overlay = null; startGame(); break; }
+    case "newrace": S.game = null; S.pending = null; S.overlay = null; S.carry = null; S.screen = "setup"; render(); break;
+    case "rematch": { S.overlay = null; S.carry = null; startGame(); break; }
+    case "carrypick": toggleCarry(+b.dataset.p, +b.dataset.o); renderModal(); break;
+    case "clearkept": { const sd = S.seats[+b.dataset.i]; if (sd) { delete sd.kept; store.set("seats", S.seats); renderSetup(); } break; }
+    case "clearallkept": S.seats.forEach(sd => delete sd.kept); store.set("seats", S.seats); renderSetup(); break;
     case "pause": if (S.game && !S.game.over) { if (T.pausedAt != null) { T.resume(); if (S.overlay && S.overlay.type === "paused") S.overlay = null; } else { T.pause(); S.overlay = { type: "paused" }; } tickClock(); renderModal(); } break;
     case "closeover": S.overlay = null; renderModal(); break;
     case "zoom": S.overlay = { type: "zoom", spec: b.dataset.z, prev: S.overlay }; ensureModalHost(); renderModal(); break;
@@ -2471,7 +2549,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 11:34 AM";
+const LT_BUILD = "Oct 15, 12:15 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
