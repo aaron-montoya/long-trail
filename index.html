@@ -289,6 +289,8 @@ html.phone .hc:hover, html.phone .hc:focus-within { transform: none; }
 html.phone .runpanel .runbtns .primary, html.phone .runpanel .runbtns [data-act=cancelrun] { display: none; }
 html.phone .summary .big { font-size: 34px; }
 html.phone .acts .act span { font-size: 12px; }
+.updbanner { position: fixed; left: 50%; top: max(10px, env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 60; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  max-width: calc(100% - 24px); padding: 8px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--hl); box-shadow: var(--shadow); font-size: 14px; }
 /* modal */
 .scrim { position: fixed; inset: 0; background: rgba(10,16,22,.55); display: grid; place-items: center; z-index: 50; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .modal { background: var(--panel); color: var(--fg); border-radius: 14px; padding: 18px; max-width: 760px; width: 100%; max-height: 100%; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
@@ -1619,7 +1621,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 10:46 AM</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 10:47 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1707,6 +1709,7 @@ function renderGame(full) {
           <select class="opt" id="botspeed2" aria-label="Bot speed">${[[1400, "Bots: slow"], [700, "Bots: normal"], [250, "Bots: fast"], [0, "Bots: instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <span class="seg sizer opt" role="group" aria-label="Card size">${["S", "M", "L"].map(v => `<button data-act="size" data-v="${v}" class="${(S.cardSize || "M") === v ? "on" : ""}" title="Card size ${v}">${v}</button>`).join("")}</span>
           <select class="opt" id="layoutsel" aria-label="Layout">${[["auto", "Layout: auto"], ["phone", "Layout: phone"], ["desktop", "Layout: desktop"]].map(([v, l]) => `<option value="${v}" ${S.layout === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+          ${onWeb ? `<button class="opt" data-act="checkupd">Check for updates</button>` : ""}
           <button class="opt" data-act="rules">Rules</button>
           <button class="opt" data-act="newrace">New race</button>
         </div>
@@ -2343,6 +2346,9 @@ document.addEventListener("click", e => {
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
     // game header
+    case "reloadlatest": reloadLatest(); break;
+    case "checkupd": checkForUpdate(true); break;
+    case "dismissupd": { const b = $("#updbanner"); if (b) b.remove(); break; }
     case "menu": { const t = $(".top"); if (t) t.classList.toggle("showtools"); break; }
     case "rules": S.overlay = { type: "rules" }; renderModal(); break;
     case "newrace": S.game = null; S.pending = null; S.overlay = null; S.screen = "setup"; render(); break;
@@ -2435,6 +2441,29 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && S.overlay && (S.overlay.type === "rules" || S.overlay.type === "freepick" || S.overlay.type === "artcheck")) { S.overlay = null; renderModal(); }
 });
 
+// ---------------- Updates (for the GitHub Pages copy) ----------------
+const LT_BUILD = "Oct 15, 10:47 AM";
+const onWeb = /github\.io$/i.test(location.hostname);
+function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
+async function checkForUpdate(manual) {
+  if (!onWeb) return;
+  try {
+    const r = await fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" });
+    const t = await r.text();
+    const m = t.match(/const LT_BUILD = "([^"]+)"/);
+    if (m && m[1] !== LT_BUILD) showUpdateBanner(m[1]);
+    else if (manual) showUpdateBanner(null);
+  } catch { if (manual) reloadLatest(); }
+}
+function showUpdateBanner(newer) {
+  let b = $("#updbanner");
+  if (!b) { b = document.createElement("div"); b.id = "updbanner"; b.className = "updbanner"; document.body.appendChild(b); }
+  b.innerHTML = newer
+    ? `<span>A newer version is ready (build ${esc(newer)}).</span><button class="primary" data-act="reloadlatest">Update now</button><button data-act="dismissupd" aria-label="Dismiss">✕</button>`
+    : `<span>You have the latest version (build ${esc(LT_BUILD)}).</span><button data-act="dismissupd" aria-label="Dismiss">OK</button>`;
+}
+setInterval(() => { if (!S.game || S.game.over) checkForUpdate(false); }, 5 * 60 * 1000);
+
 // ---------------- Boot ----------------
 (async () => {
   applySize();
@@ -2442,6 +2471,7 @@ document.addEventListener("keydown", e => {
   const had = await restoreFiles();
   if (!had) await loadManifest();
   if (S.screen === "setup") renderSetup();
+  checkForUpdate(false);
 })();
 window.__LT = S;
 })();
