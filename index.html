@@ -254,41 +254,40 @@ button.ghost { background: transparent; }
 .mobilebar .mbsum b.ok { color: var(--good); } .mobilebar .mbsum b.short { color: var(--bad); }
 .mobilebar .mbv { font-weight: 700; font-size: 12.5px; }
 .mobilebar .mbv .ok { color: var(--good); } .mobilebar .mbv .short { color: var(--bad); }
-@media (max-width: 700px) {
-  body.hasbar { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-  .wrap { padding-block: 8px 24px; }
-  .top { gap: 6px 10px; margin-bottom: 8px; }
-  .top h1 { font-size: 19px; }
-  .top .meta { font-size: 12.5px; gap: 4px 10px; order: 3; flex-basis: 100%; }
-  .top .tools { gap: 4px; }
-  .top .tools .opt { display: none; }
-  .top.showtools .tools .opt { display: inline-flex; }
-  .top.showtools .tools { flex-wrap: wrap; }
-  .menubtn { display: inline-block; }
-  .clock b { font-size: 16px; }
-  .stripbox { padding: 6px; border-radius: 10px; }
-  .slotlab { font-size: 10.5px; }
-  .players { display: flex; overflow-x: auto; gap: 6px; scroll-snap-type: x proximity; margin: 8px 0; padding-bottom: 2px; }
-  .players .pl { flex: 0 0 auto; width: min(78vw, 260px); scroll-snap-align: start; padding: 6px 8px; }
-  .players .pl .last { display: none; }
-  .players .pl .nm b { font-size: 15px; }
-  .chip { font-size: 11.5px; }
-  .board, .runpanel, .logbox { padding: 10px; border-radius: 10px; }
-  .musherrow { gap: 10px; }
-  .board .musherrow > .card { --w: 74px; }
-  .mtext { font-size: 13px; }
-  .mtext .side { padding: 4px 6px; }
-  .mtext .side.off { display: none; }
-  .tableau:has(> .empty) { display: none; }
-  .tableau { padding: 6px; gap: 8px; }
-  .tableau .row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
-  .hand { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x proximity; gap: 8px; padding: 4px 2px 8px; }
-  .hc { scroll-snap-align: start; }
-  .hc:hover, .hc:focus-within { transform: none; }
-  .runpanel .runbtns .primary, .runpanel .runbtns [data-act=cancelrun] { display: none; }
-  .summary .big { font-size: 34px; }
-  .acts .act span { font-size: 12px; }
-}
+/* phone layout (auto on narrow or touch screens, or chosen in the menu) */
+html.phone body.hasbar { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+html.phone .wrap { padding-block: 8px 24px; }
+html.phone .top { gap: 6px 10px; margin-bottom: 8px; }
+html.phone .top h1 { font-size: 19px; }
+html.phone .top .meta { font-size: 12.5px; gap: 4px 10px; order: 3; flex-basis: 100%; }
+html.phone .top .tools { gap: 4px; }
+html.phone .top .tools .opt { display: none; }
+html.phone .top.showtools .tools .opt { display: inline-flex; }
+html.phone .top.showtools .tools { flex-wrap: wrap; }
+html.phone .menubtn { display: inline-block; }
+html.phone .clock b { font-size: 16px; }
+html.phone .stripbox { padding: 6px; border-radius: 10px; }
+html.phone .slotlab { font-size: 10.5px; }
+html.phone .players { display: flex; overflow-x: auto; gap: 6px; scroll-snap-type: x proximity; margin: 8px 0; padding-bottom: 2px; }
+html.phone .players .pl { flex: 0 0 auto; width: min(78vw, 260px); scroll-snap-align: start; padding: 6px 8px; }
+html.phone .players .pl .last { display: none; }
+html.phone .players .pl .nm b { font-size: 15px; }
+html.phone .chip { font-size: 11.5px; }
+html.phone .board, html.phone .runpanel, html.phone .logbox { padding: 10px; border-radius: 10px; }
+html.phone .musherrow { gap: 10px; }
+html.phone .board .musherrow > .card { --w: 74px; }
+html.phone .mtext { font-size: 13px; }
+html.phone .mtext .side { padding: 4px 6px; }
+html.phone .mtext .side.off { display: none; }
+html.phone .tableau:has(> .empty) { display: none; }
+html.phone .tableau { padding: 6px; gap: 8px; }
+html.phone .tableau .row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+html.phone .hand { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x proximity; gap: 8px; padding: 4px 2px 8px; }
+html.phone .hc { scroll-snap-align: start; }
+html.phone .hc:hover, html.phone .hc:focus-within { transform: none; }
+html.phone .runpanel .runbtns .primary, html.phone .runpanel .runbtns [data-act=cancelrun] { display: none; }
+html.phone .summary .big { font-size: 34px; }
+html.phone .acts .act span { font-size: 12px; }
 /* modal */
 .scrim { position: fixed; inset: 0; background: rgba(10,16,22,.55); display: grid; place-items: center; z-index: 50; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .modal { background: var(--panel); color: var(--fg); border-radius: 14px; padding: 18px; max-width: 760px; width: 100%; max-height: 100%; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
@@ -1489,6 +1488,7 @@ const S = {
   ]),
   botSpeed: store.get("botSpeed", 700),
   cardSize: store.get("cardSize", "M"),
+  layout: store.get("layout", "auto"),
   mode: store.get("mode", "standard"),
   rules: store.get("rules", {}),
   legs: store.get("legs", [2, 3, 5]),
@@ -1652,6 +1652,7 @@ function renderSetup() {
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
       <div class="opts" style="margin-top:12px">
+        <label>Layout <select id="layoutsel2">${[["auto", "Auto"], ["phone", "Phone"], ["desktop", "Desktop"]].map(([v, l]) => `<option value="${v}" ${S.layout === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>Bot speed <select id="botspeed">
           ${[[1400, "Slow"], [700, "Normal"], [250, "Fast"], [0, "Instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}
         </select></label>
@@ -1704,6 +1705,7 @@ function renderGame(full) {
           <button class="menubtn" data-act="menu" aria-label="More options">☰</button>
           <select class="opt" id="botspeed2" aria-label="Bot speed">${[[1400, "Bots: slow"], [700, "Bots: normal"], [250, "Bots: fast"], [0, "Bots: instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <span class="seg sizer opt" role="group" aria-label="Card size">${["S", "M", "L"].map(v => `<button data-act="size" data-v="${v}" class="${(S.cardSize || "M") === v ? "on" : ""}" title="Card size ${v}">${v}</button>`).join("")}</span>
+          <select class="opt" id="layoutsel" aria-label="Layout">${[["auto", "Layout: auto"], ["phone", "Layout: phone"], ["desktop", "Layout: desktop"]].map(([v, l]) => `<option value="${v}" ${S.layout === v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <button class="opt" data-act="rules">Rules</button>
           <button class="opt" data-act="newrace">New race</button>
         </div>
@@ -2240,13 +2242,21 @@ function ensureModalHost() { if (!$("#modal")) app.insertAdjacentHTML("beforeend
 const SIZES = { S: [120, 84], M: [150, 96], L: [190, 112] };
 function applySize() {
   const [h, s] = SIZES[S.cardSize] || SIZES.M;
-  const narrow = window.matchMedia("(max-width: 700px)").matches;
+  applyLayout();
+  const narrow = isNarrow();
   const vw = { S: 26, M: 31, L: 40 }[S.cardSize] || 31;
   document.documentElement.style.setProperty("--handw", narrow ? `min(${h}px, ${vw}vw)` : `min(${h}px, 40vw)`);
   document.documentElement.style.setProperty("--stripw", narrow ? `min(${s}px, ${vw - 13}vw)` : `min(${s}px, 19vw)`);
 }
 
-const isNarrow = () => window.matchMedia("(max-width: 700px)").matches;
+function wantPhone() {
+  const pref = S.layout || "auto";
+  if (pref === "phone") return true;
+  if (pref === "desktop") return false;
+  return window.matchMedia("(max-width: 700px)").matches || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth <= 1180);
+}
+function applyLayout() { document.documentElement.classList.toggle("phone", wantPhone()); }
+const isNarrow = () => document.documentElement.classList.contains("phone");
 // Keep the part of the trail where the action is in view on small screens.
 function scrollStripToAction() {
   const box = $(".stripbox"), g = S.game; if (!box || !g) return;
@@ -2277,7 +2287,7 @@ function buildMobileBar() {
   bar.hidden = !html;
   document.body.classList.toggle("hasbar", !!html);
 }
-window.addEventListener("resize", () => { if (S.screen === "game" && S.game) { applySize(); renderGame(); } });
+window.addEventListener("resize", () => { applySize(); if (S.screen === "game" && S.game) renderGame(); });
 
 // ---------------- Events ----------------
 document.addEventListener("input", e => {
@@ -2294,6 +2304,7 @@ document.addEventListener("change", async e => {
   if (t.id === "rule-push") { if (t.checked) delete S.rules.noPushPerDog; else S.rules.noPushPerDog = true; store.set("rules", S.rules); }
   if (t.id === "rule-vet") { if (t.checked) S.rules.vetCheck = true; else delete S.rules.vetCheck; store.set("rules", S.rules); }
   if (t.id === "rule-big") { if (t.checked) S.rules.bigLine = 5; else delete S.rules.bigLine; store.set("rules", S.rules); }
+  if (t.id === "layoutsel" || t.id === "layoutsel2") { S.layout = t.value; store.set("layout", S.layout); applySize(); if (S.game && S.screen === "game") renderGame(true); }
   if (t.id === "botspeed" || t.id === "botspeed2") { S.botSpeed = +t.value; store.set("botSpeed", S.botSpeed); }
   if (t.id === "artpick" || t.id === "artpick2") {
     const n = useFiles(t.files, true);
