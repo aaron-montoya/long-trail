@@ -318,6 +318,7 @@ html.phone .acts .act span { font-size: 12px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
 .opts { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 .artstat { font-size: 14px; }
+.stdline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .legs { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 6px 0 4px; }
 .legs label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
 .legs select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); width: 80px; }
@@ -473,7 +474,7 @@ const LT = (() => {
 
       const trails = TRAILS.map(t => ({ id: nid("t"), type: "T", name: t[0], cost: t[1], rtype: t[2], up: false, reward: null }));
       this.shuffle(trails);
-      const legs = (opts.legs && opts.legs.length === 3 ? opts.legs : [2, 3, 5]).map(n => Math.max(1, Math.min(8, n | 0)));
+      const legs = (opts.legs && opts.legs.length === 3 ? opts.legs : [1, 2, 4]).map(n => Math.max(1, Math.min(8, n | 0)));
       while (legs.reduce((x, y) => x + y, 0) > trails.length) legs[legs.indexOf(Math.max(...legs))]--;
       this.legs = legs;
       this.path = [];
@@ -1047,8 +1048,10 @@ const LT = (() => {
     }
     // What a checkpoint camp gives: [dogs drawn, dogs kept, gear drawn (keep 1)]
     cpGains(cp, long) {
-      if (this.mode === "lean") return long ? [2, 1, 2] : [1, 1, 1];
-      return long ? [3, 2, 2] : [2, 2, 1];
+      // "standard" (formerly "lean"): camp = 1 dog + top gear; Long Rest = draw 2 dogs keep 1, draw 2 gear keep 1.
+      // "generous" (the old standard): camp = draw 2 dogs + top gear; Long Rest = draw 3 keep 2, draw 2 gear keep 1.
+      if (this.mode === "generous") return long ? [3, 2, 2] : [2, 2, 1];
+      return long ? [2, 1, 2] : [1, 1, 1];
     }
     async doCampCP(p, long) {
       const cp = this.path[p.pos].cp;
@@ -1493,8 +1496,8 @@ const S = {
   cardSize: store.get("cardSize", "M"),
   layout: store.get("layout", "auto"),
   mode: store.get("mode", "standard"),
-  rules: store.get("rules", {}),
-  legs: store.get("legs", [2, 3, 5]),
+  rules: store.get("rules", { lineMax: 6, noHarsh: true }),
+  legs: store.get("legs", [1, 2, 4]),
   game: null,
   pending: null,      // {p, req, resolve}
   run: null,          // run builder {line:[ids], gear:Set}
@@ -1505,6 +1508,15 @@ const S = {
   overlay: null,      // local modal (free gear target etc.)
   showLog: true,
 };
+// The standard game: 1-2-4 trails, standard (lean) checkpoints, no harsh weather, 6-dog gangline.
+const STANDARD = { legs: [1, 2, 4], mode: "standard", rules: { lineMax: 6, noHarsh: true } };
+function resetToStandard() {
+  S.legs = STANDARD.legs.slice(); S.mode = STANDARD.mode; S.rules = { ...STANDARD.rules };
+  store.set("legs", S.legs); store.set("mode", S.mode); store.set("rules", S.rules);
+}
+// Settings saved before the new standard used old names/defaults: move everyone onto the new standard once.
+if (store.get("settingsVer", 1) < 2) { resetToStandard(); store.set("settingsVer", 2); }
+if (S.mode === "lean") { S.mode = "standard"; store.set("mode", S.mode); }
 const humans = () => S.game ? S.game.players.filter(p => !p.bot) : [];
 
 // ---------------- Game IO ----------------
@@ -1621,7 +1633,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 10:47 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 10:57 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1632,15 +1644,17 @@ function renderSetup() {
       <span class="small" style="align-self:center">Later seats start with extra gear: +1, +2, +3.</span></div>
     </div>
     <div class="panel">
+      ${(() => { const isStd = S.legs.join("-") === "1-2-4" && S.mode !== "generous" && S.rules.lineMax === 6 && S.rules.noHarsh && !S.rules.noStorm && !S.rules.noPushPerDog && !S.rules.vetCheck && !S.rules.bigLine;
+        return `<div class="stdline">${isStd ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · standard checkpoints · 6-dog gangline · storm and no easy pushing on the final leg · no harsh weather</span>` : `<span class="chip warn">Custom rules</span><button data-act="stdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>`; })()}
       <div class="label">Trail layout</div>
       <div class="legs">
         ${["Before Checkpoint 1", "Between the checkpoints", "Final leg"].map((t, i) => `<label><span>${t}</span><select data-leg="${i}">${[1, 2, 3, 4, 5, 6].map(v => `<option ${S.legs[i] == v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}
-        <span class="small legtotal">${S.legs.reduce((a, b) => a + b, 0)} trails · standard is 2-3-5 <button class="ghost" data-act="legreset" style="padding:2px 8px;font-size:12px">Reset</button></span>
+        <span class="small legtotal">${S.legs.reduce((a, b) => a + b, 0)} trails · standard is 1-2-4</span>
       </div>
       <div class="label" style="margin-top:14px">Checkpoint rules</div>
       <div class="modes">
-        <label><input type="radio" name="mode" value="standard" ${S.mode !== "lean" ? "checked" : ""}> <span><b>Standard</b><small>Normal camp: draw 2 dogs and the top gear. Long Rest: draw 3 dogs keep 2, draw 2 gear keep 1.</small></span></label>
-        <label><input type="radio" name="mode" value="lean" ${S.mode === "lean" ? "checked" : ""}> <span><b>Lean checkpoints</b><small>Normal camp: take 1 dog and the top gear. Long Rest: draw 2 dogs keep 1, draw 2 gear keep 1. Long Rest still returns used gear, skips a turn and flips your musher.</small></span></label>
+        <label><input type="radio" name="mode" value="standard" ${S.mode !== "generous" ? "checked" : ""}> <span><b>Standard</b><small>Normal camp: take 1 dog and the top gear. Long Rest: draw 2 dogs keep 1, draw 2 gear keep 1, used gear returns, skip a turn, flip your musher.</small></span></label>
+        <label><input type="radio" name="mode" value="generous" ${S.mode === "generous" ? "checked" : ""}> <span><b>Well-stocked checkpoints</b><small>Easier, slower races. Normal camp: draw 2 dogs and the top gear. Long Rest: draw 3 dogs keep 2, draw 2 gear keep 1.</small></span></label>
       </div>
       <div class="label" style="margin-top:14px">Final-leg weather</div>
       <div class="modes">
@@ -1648,9 +1662,9 @@ function renderSetup() {
         <label><input type="checkbox" id="rule-harsh" ${!S.rules.noHarsh ? "checked" : ""}> <span><b>Harsh weather</b><small>On the final leg, any Event that removes a dog removes 2 instead.</small></span></label>
         <label><input type="checkbox" id="rule-push" ${!S.rules.noPushPerDog ? "checked" : ""}> <span><b>No easy pushing</b><small>On the final leg, draw one Event for each tired dog you push (instead of one per Run).</small></span></label>
       </div>
-      <div class="label" style="margin-top:14px">Test rules for a tougher final stretch</div>
+      <div class="label" style="margin-top:14px">Team and final-stretch rules</div>
       <div class="modes">
-        <label><span style="flex:none"><select id="rule-line"><option value="0" ${!S.rules.lineMax ? "selected" : ""}>No limit</option><option value="7" ${S.rules.lineMax == 7 ? "selected" : ""}>7 dogs</option><option value="6" ${S.rules.lineMax == 6 ? "selected" : ""}>6 dogs</option><option value="5" ${S.rules.lineMax == 5 ? "selected" : ""}>5 dogs</option></select></span><span><b>Gangline limit</b><small>The most dogs you can run in one line.</small></span></label>
+        <label><span style="flex:none"><select id="rule-line"><option value="0" ${!S.rules.lineMax ? "selected" : ""}>No limit</option><option value="7" ${S.rules.lineMax == 7 ? "selected" : ""}>7 dogs</option><option value="6" ${S.rules.lineMax == 6 ? "selected" : ""}>6 dogs (standard)</option><option value="5" ${S.rules.lineMax == 5 ? "selected" : ""}>5 dogs</option></select></span><span><b>Gangline limit</b><small>The most dogs you can run in one line.</small></span></label>
         <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is sent home.</small></span></label>
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
@@ -1723,7 +1737,7 @@ function renderGame(full) {
     renderLog(true);
   }
   const cur = g.current;
-  $("#meta").innerHTML = `${g.legs.join("-") !== "2-3-5" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "lean" ? `<span class="chip">Lean checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${g.rules.noHarsh ? `<span class="chip">No harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax ? `<span class="chip">Gangline ${g.rules.lineMax}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
+  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No storm</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.noPushPerDog ? `<span class="chip">Easy pushing</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span><span>Events left ${g.eventDeck.length}</span><span>Dogs left ${g.dogDeck.length}</span><span>Gear left ${g.gearDeck.length}</span>`;
   renderStrip();
   $("#players").innerHTML = g.players.map(p => `
     <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
@@ -2201,20 +2215,28 @@ function zoomHTML(spec) {
 }
 
 function rulesHTML() {
+  const g = S.game;
+  const mode = g ? g.mode : S.mode, rules = g ? g.rules : S.rules, legs = g ? g.legs : S.legs;
+  const gen = mode === "generous";
+  const fl = [];
+  if (!rules.noStorm) fl.push("<b>Storm:</b> start your turn on a final-leg trail, draw an Event.");
+  if (!rules.noHarsh) fl.push("<b>Harsh weather:</b> Events that remove a dog remove 2.");
+  if (!rules.noPushPerDog) fl.push("<b>No easy pushing:</b> each pushed tired dog draws an Event.");
   return `<h3>Long Trail · quick rules</h3>
+  <p class="small">This race: ${legs.join("-")} trails${rules.lineMax ? ` · ${rules.lineMax}-dog gangline` : ""} · ${gen ? "well-stocked" : "standard"} checkpoints.</p>
   <details class="rules" open><summary>Your turn: Run, Slog or Camp</summary><ul>
-    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you). Rested dogs use full Speed, ability and role bonus; tired dogs only tired Speed. Lead first +1, Wheel last +1.</li>
-    <li>Pay each trail's cost to move onto it and keep going while you can. Drafting: a trail costs 1 less if another musher is on or past it.</li>
-    <li>After a Run, rested dogs that ran become tired, tired ones become exhausted. Ran any tired dogs? Draw 1 Event (final leg: 1 per tired dog).</li>
-    <li>If your Run ends on a trail with a reward, take it.</li>
+    <li><b>Run:</b> line up rested dogs (hand) and/or tired dogs (in front of you)${rules.lineMax ? `, at most ${rules.lineMax} dogs` : ""}. Rested dogs use full Speed, ability and role bonus; tired dogs only tired Speed. Lead first +1, Wheel last +1.</li>
+    <li>Pay each trail's cost to move onto it and keep going while you can. Drafting: a trail costs 1 less if another musher is on or past it (Deep Powder: 3 less).</li>
+    <li>After a Run, rested dogs that ran become tired, tired ones become exhausted. Then draw any River Ice Event, then push Events: ran any tired dogs? Draw 1 Event.</li>
+    <li>If your Run ends on a trail with a reward (or stops at a checkpoint right after one), take it.</li>
     <li><b>Slog:</b> move one trail with no dogs and draw an Event. Once per leg. No reward.</li>
     <li><b>Camp:</b> draw an Event first, then all tired and exhausted dogs return to your hand. Used gear stays used.</li></ul></details>
   <details class="rules"><summary>Checkpoints and the Long Rest</summary><ul>
     <li>Checkpoints cost 0. Reaching the last trail of a leg puts you in the checkpoint; with Speed left you may stop or keep going.</li>
-    <li>Camp once per checkpoint, no Event. Normal camp: dogs back, draw 2 dogs, take the top gear.</li>
-    <li>Long Rest (exactly once, either checkpoint, required before passing Checkpoint 2): dogs and used gear back, draw 3 dogs keep 2, draw 2 gear keep 1, skip your next turn, then flip your musher.</li></ul></details>
+    <li>Camp once per checkpoint, no Event. Normal camp: dogs back, ${gen ? "draw 2 dogs" : "take 1 dog"}, take the top gear.</li>
+    <li>Long Rest (exactly once, either checkpoint, required before passing Checkpoint 2): dogs and used gear back, ${gen ? "draw 3 dogs keep 2" : "draw 2 dogs keep 1"}, draw 2 gear keep 1, skip your next turn, then flip your musher.</li></ul></details>
   <details class="rules"><summary>Final leg and Events</summary><ul>
-    <li>Storm: start your turn on a final-leg trail, draw an Event. Events that remove a dog remove 2. Each pushed tired dog draws an Event.</li>
+    ${fl.length ? fl.map(x => `<li>${x}</li>`).join("") : "<li>No extra final-leg weather in this race.</li>"}
     <li>Removed dogs must be tired or exhausted if you have any. No dogs left: you're scratched.</li>
     <li>Finish costs 2. First musher there wins.</li></ul></details>
   <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
@@ -2342,7 +2364,7 @@ document.addEventListener("click", e => {
     case "addseat": if (S.seats.length < 4) { const i = S.seats.length; S.seats.push({ name: "Bot " + ["Kit", "Juno", "Moss", "Pike"][i], bot: true, musher: "Random" }); store.set("seats", S.seats); renderSetup(); } break;
     case "rmseat": if (S.seats.length > 2) { S.seats.splice(+b.dataset.i, 1); store.set("seats", S.seats); renderSetup(); } break;
     case "start": startGame(); break;
-    case "legreset": S.legs = [2, 3, 5]; store.set("legs", S.legs); renderSetup(); break;
+    case "legreset": case "stdreset": resetToStandard(); renderSetup(); break;
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
     // game header
@@ -2442,7 +2464,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 10:47 AM";
+const LT_BUILD = "Oct 15, 10:57 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
