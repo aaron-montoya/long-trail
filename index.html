@@ -346,7 +346,7 @@ const LT = (() => {
     ["Comet", "Lead", 2, 2, "comet", "Her Lead bonus is +2."],
     ["Scout", "Lead", 1, 2, "scout", "When Scout runs first, look at the next face-down trail."],
     ["Alpine", "Lead", 1, 1, "ignore1", "When Alpine runs, ignore the first Event you draw this turn."],
-    ["Nanook", "Lead", 2, 2, "nanook", "When Nanook runs, Spruce Forest and Exposed Ridge cost 1 less."],
+    ["Nanook", "Lead", 2, 2, "nanook", "When Nanook runs, Spruce Forest and Exposed Ridge have 1 less Difficulty."],
     ["Kestrel", "Lead", 3, 2, "flighty", "Her Lead bonus counts only if 3 or more dogs run."],
     ["Birch", "Lead", 1, 2, "birch", "If Birch runs first, the second dog in line gets +2."],
     ["Aurora", "Lead", 3, 3, "ignore1", "When Aurora runs, ignore the first Event you draw this turn."],
@@ -377,11 +377,11 @@ const LT = (() => {
     ["Snack", 4, "run", "+2 Speed this Run."],
     ["Booties", 3, "run", "Tired dogs on this Run don't make you draw Events."],
     ["Dog Food", 3, "free", "Return one exhausted dog to your hand."],
-    ["Snow Hook", 3, "run", "Mountain Pass and Deep Powder cost 2 less this Run."],
+    ["Snow Hook", 3, "run", "Mountain Pass and Deep Powder have 2 less Difficulty this Run."],
     ["Headlamp", 3, "free", "Look at the next two face-down trails."],
     ["Sled Basket", 2, "react", "Play when a dog would be removed: it becomes exhausted instead. Then remove Sled Basket from the game."],
     ["Bivy Sack", 3, "camp", "Play when you camp in the open: draw no Event."],
-    ["Wax the Runners", 2, "run", "Every trail costs 1 less this Run (minimum 1)."],
+    ["Wax the Runners", 2, "run", "Every trail has 1 less Difficulty this Run (minimum 1)."],
     ["Whistle", 2, "free", "Return one tired dog to your hand."],
     ["Hot Broth", 2, "free", "Return all your tired dogs to your hand."],
     ["Red Lantern", 1, "slog", "Slog without drawing an Event."],
@@ -405,14 +405,14 @@ const LT = (() => {
     "Deep Powder": "Drafting saves 3 here instead of 1.",
     "Mountain Pass": "Rested Wheel dogs count their Speed twice."
   };
-  const CP_TEXT = "Camp here once to draw 2 dogs and take 1 gear. Draw no Event. Long rest to draw 3 dogs and keep 2, draw 2 gear and keep 1, all used gear returns, then skip a turn. Draw no Event.";
+  const CP_TEXT = "Camp here once to draw 1 dog and take 1 gear. Draw no Event. Long rest to draw 2 dogs and keep 1, draw 2 gear and keep 1, all used gear returns, then skip a turn. Draw no Event.";
   const FINISH_TEXT = "The first Musher to reach the Finish wins!";
 
   const EVENTS = [
     ["Clear Skies", 2, "No effect."],
     ["Northern Lights", 1, "Keep this card. Your next Run gets +2 Speed, then discard it."],
     ["Tailwind", 2, "Keep this card. Your next Run gets +1 Speed, then discard it."],
-    ["Fresh Snow", 2, "Keep this card. On your next Run, every trail costs 1 more Speed to move onto. Then discard this card."],
+    ["Fresh Snow", 2, "Keep this card. On your next Run, every trail has 1 more Difficulty. Then discard this card."],
     ["Bitter Cold", 8, "Remove one dog, tired or exhausted first."],
     ["Blizzard", 3, "Remove one dog, tired or exhausted first. Then move back one trail, but never past a checkpoint."],
     ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
@@ -431,10 +431,10 @@ const LT = (() => {
   const MUSHERS = {
     "Sprinter": ["Every Run gets +2 Speed.", "Every Run gets +1 Speed."],
     "Champion": ["Your Lead bonus is +2.", "Every Run gets +2 Speed."],
-    "Trailbreaker": ["Trails no musher has reached yet cost you 2 less.", "Trails no musher has reached yet cost you 1 less. When you take a trail reward, also take the top Gear card."],
+    "Trailbreaker": ["Trails no musher has reached yet have 2 less Difficulty for you.", "Trails no musher has reached yet have 1 less Difficulty for you. When you take a trail reward, also take the top Gear card."],
     "Rookie": ["Once per leg, ignore an Event you draw.", "Every Run gets +1 Speed."],
     "Night Runner": ["Your first Run after camping gets +4 Speed.", "Your first Run after camping gets +3 Speed. Camping in the open makes you draw no Event."],
-    "Veteran": ["Slogging never makes you draw an Event.", "Final-leg trails cost you 1 less."],
+    "Veteran": ["Slogging never makes you draw an Event.", "Final-leg trails have 1 less Difficulty for you."],
     "Gambler": ["Whenever you draw an Event, draw 2 and choose 1.", "Each tired dog you push gets +1 Speed."],
     "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 3 extra and choose which to keep. When you take a trail reward, also take the top card of the Dog deck.", "When you take a trail reward or camp in the open, also take the top card of the Dog deck."],
   };
@@ -1639,7 +1639,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 11:24 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 11:28 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2471,7 +2471,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 11:24 AM";
+const LT_BUILD = "Oct 15, 11:28 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
