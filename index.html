@@ -478,7 +478,7 @@ const LT = (() => {
       "Cocoa": ["While Cocoa is on your gangline, camping in the open also returns one used gear.", "While Cocoa is on your gangline, camping in the open also returns one used gear."],
       "Shadow": ["While Shadow is on your gangline, River Ice and Exposed Ridge never make you draw Events.", "While Shadow is on your gangline, River Ice and Exposed Ridge never make you draw Events."],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
-      "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
+      "Anvil": ["+2 if 2 or more dogs in your line aren't exhausted.", ""],
       "Boulder": ["While Boulder is on your gangline and rested, Events can't move you back a trail.", ""],
     },
     gear: {
@@ -704,7 +704,7 @@ const LT = (() => {
         if (d.ab === "mitts" && i > 0 && line[i - 1].dog.role === "Lead") v += 2;
         if (d.ab === "echo" && !line.some(y => y.st === "tired")) v += 2;
         if (d.ab === "packer") v += runN - 1;
-        if (d.ab === "anvil" && runN >= 4) v += 2;
+        if (d.ab === "anvil" && runN >= (this.format === "gangline" ? 2 : 4)) v += 2; // Gangline: 2 or more
         if (d.ab === "underdog" && this.players.some(q => q !== p && !q.scratched && q.pos > p.pos)) v += this.rules.gUnderdog || 2;
         if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
         if (d.ab === "aurora" && p.pos >= 0 && this.finalLeg(p.pos)) v += 2;
@@ -2283,7 +2283,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 9:39 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 9:41 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3318,7 +3318,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 9:39 AM";
+const LT_BUILD = "Oct 16, 9:41 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
