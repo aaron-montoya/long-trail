@@ -382,7 +382,11 @@ html.phone.logsheet #app.game .logbox .log { max-height: none; }
 
 /* phone fixes: used gear as text, small zoom buttons, one-row bottom bar, slimmer top */
 .usedline { display: none; }
-html.phone #app.game .usedline { display: block; }
+html.phone #app.game .usedline { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
+html.phone #app.game .usedline .label { font-size: 9.5px; display: block; }
+html.phone #app.game .usedline .minis { display: flex; gap: 4px; flex-wrap: wrap; }
+html.phone #app.game .usedline .card { --w: max(34px, calc(var(--handw) * .48)); }
+html.phone #app.game .usedline .card.dim { opacity: .7; }
 html.phone #app.game .board.gboard .tableau.gline .tz + .tz { display: none; }
 .linkish { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; font: inherit; cursor: pointer; }
 html.phone #app.game .zoomb { width: 18px; height: 18px; min-width: 18px; min-height: 18px; font-size: 10px; left: 2px; top: 2px; opacity: .8; }
@@ -2492,7 +2496,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 2:44 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 2:48 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2810,7 +2814,7 @@ function renderGBoard(p, myTurn) {
       <div class="mtext">
         <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
         <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · dropped: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
-        ${p.used.length || p.keptEvents.length ? `<div class="small usedline">${p.used.length ? `Used gear: ${p.used.map(x => esc(x.name)).join(", ")}` : ""}${p.used.length && p.keptEvents.length ? " · " : ""}${p.keptEvents.length ? `Kept: ${p.keptEvents.map(e => `<button class="linkish" data-zoom="event|${esc(e)}">${esc(e)}</button>`).join(", ")}` : ""}</div>` : ""}
+        ${p.used.length || p.keptEvents.length ? `<div class="usedline">${p.used.length ? `<div class="ul"><span class="label">Used gear</span><div class="minis">${p.used.map(x => gearCard(x, { dim: true })).join("")}</div></div>` : ""}${p.keptEvents.length ? `<div class="ul"><span class="label">Kept Events</span><div class="minis">${p.keptEvents.map(e => eventCard(e)).join("")}</div></div>` : ""}</div>` : ""}
         <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(musherT(p.musher)[0])}</div>
         <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(musherT(p.musher)[1])}</div>
       </div>
@@ -3648,7 +3652,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 2:44 PM";
+const LT_BUILD = "Oct 16, 2:48 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
