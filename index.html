@@ -337,6 +337,12 @@ html.phone .acts .act span { font-size: 12px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
 .opts { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 .artstat { font-size: 14px; }
+.fmttabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin: -4px 0 12px; }
+.fmttabs button { flex: 1; font: inherit; font-weight: 600; font-size: 16px; padding: 10px 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); cursor: pointer; border-radius: 0; }
+.fmttabs button.on { color: var(--fg); border-bottom-color: var(--accent); }
+.fmttabs button .small { font-weight: 400; }
+.fmtdesc { margin: 0 0 4px; }
+.glsize { display: inline-flex; flex-wrap: wrap; margin-top: 6px; }
 .stdline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .legs { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 6px 0 4px; }
 .legs label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
@@ -2043,6 +2049,7 @@ const S = {
   layout: store.get("layout", "auto"),
   mode: store.get("mode", "standard"),
   rules: store.get("rules", { lineMax: 6, noHarsh: true }),
+  gLineMax: store.get("gLineMax", 6), // Gangline: most dogs on your gangline (4, 5 or 6)
   legs: store.get("legs", [1, 2, 4]),
   game: null,
   pending: null,      // {p, req, resolve}
@@ -2180,7 +2187,9 @@ async function startGame(seed, resume) {
   else {
     const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
     store.set("seats", S.seats);
-    opts = { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice(), format: S.format };
+    opts = S.format === "gangline"
+      ? { players: seats, seed, mode: "standard", rules: { lineMax: S.gLineMax, noHarsh: true, noStorm: true }, legs: S.legs.slice(), format: "gangline" }
+      : { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice(), format: "classic" };
   }
   const io = makeIO();
   S.game = new LT.Game({ ...opts, io });
@@ -2272,7 +2281,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 9:17 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 9:28 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2290,13 +2299,14 @@ function renderSetup() {
       ${S.seats.some(sd => keptText(sd.kept)) ? `<button class="ghost" data-act="clearallkept">Start fresh (clear kept cards)</button>` : ""}</div>
     </div>
     <div class="panel">
+      <div class="fmttabs" role="tablist" aria-label="Game format">
+        <button role="tab" data-act="fmttab" data-v="classic" class="${S.format !== "gangline" ? "on" : ""}" aria-selected="${S.format !== "gangline"}">Classic</button>
+        <button role="tab" data-act="fmttab" data-v="gangline" class="${S.format === "gangline" ? "on" : ""}" aria-selected="${S.format === "gangline"}">Gangline <span class="small">prototype</span></button>
+      </div>
+      ${S.format !== "gangline" ? `
       ${(() => { const isStd = S.legs.join("-") === "1-2-4" && S.mode !== "generous" && S.rules.lineMax === 6 && S.rules.noHarsh && !S.rules.noStorm && !S.rules.vetCheck && !S.rules.bigLine && !S.rules.finalRunMax && !S.rules.handLimit;
         return `<div class="stdline">${isStd ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · standard checkpoints · 6-dog gangline · an Event each turn on the final leg · no harsh weather</span>` : `<span class="chip warn">Custom rules</span><button data-act="stdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>`; })()}
-      <div class="label">Game format</div>
-      <div class="modes">
-        <label><input type="radio" name="format" value="classic" ${S.format !== "gangline" ? "checked" : ""}> <span><b>Classic</b><small>Build a team from your hand each turn and run it as far as its Speed takes you.</small></span></label>
-        <label><input type="radio" name="format" value="gangline" ${S.format === "gangline" ? "checked" : ""}> <span><b>Gangline (prototype)</b><small>Your team stays on the table. Each turn: hitch one dog at the front or back, then Run (one trail at a time; your front 2 dogs tire each step and every trail after the first draws an Event; keep going while your Speed covers the next trail) or Camp (every dog recovers one step). Then draw one Event.</small></span></label>
-      </div>
+      <p class="small fmtdesc">Build a team from your hand each turn and run it as far as its Speed takes you.</p>
       <div class="label" style="margin-top:14px">Trail layout</div>
       <div class="legs">
         ${["Before Checkpoint 1", "Between the checkpoints", "Final leg"].map((t, i) => `<label><span>${t}</span><select data-leg="${i}">${[1, 2, 3, 4, 5, 6].map(v => `<option ${S.legs[i] == v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}
@@ -2318,6 +2328,20 @@ function renderSetup() {
         <label><input type="checkbox" id="rule-vet" ${S.rules.vetCheck ? "checked" : ""}> <span><b>Vet check</b><small>When you reach Checkpoint 2, every exhausted dog (and any dog you pushed to get there) is dropped.</small></span></label>
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
+` : `
+      <div class="stdline">${S.legs.join("-") === "1-2-4" && S.gLineMax === 6 ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · 6-dog gangline · Finish Difficulty 5</span>` : `<span class="chip warn">Custom rules</span><button data-act="gstdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>
+      <p class="small fmtdesc">Your team stays on the table. Each turn: hitch one dog at the front or back, then Run (one trail at a time; your front 2 dogs tire each step and every trail after the first draws an Event; keep going while your Speed covers the next trail) or Camp (every dog recovers one step). Then draw one Event.</p>
+      <div class="label" style="margin-top:14px">Trail layout</div>
+      <div class="legs">
+        ${["Before Checkpoint 1", "Between the checkpoints", "Final leg"].map((t, i) => `<label><span>${t}</span><select data-leg="${i}">${[1, 2, 3, 4, 5, 6].map(v => `<option ${S.legs[i] == v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}
+        <span class="small legtotal">${S.legs.reduce((a, b) => a + b, 0)} trails · standard is 1-2-4</span>
+      </div>
+      <div class="label" style="margin-top:14px">Gangline size</div>
+      <div class="seg glsize" role="group" aria-label="Gangline size">
+        ${[4, 5, 6].map(v => `<button data-act="glinemax" data-v="${v}" class="${S.gLineMax === v ? "on" : ""}">${v} dogs${v === 6 ? " (standard)" : ""}</button>`).join("")}
+      </div>
+      <p class="small">The most dogs you can have on your gangline at once.</p>
+      `}
       <div class="opts" style="margin-top:12px">
         <label>Layout <select id="layoutsel2">${[["auto", "Auto"], ["phone", "Phone"], ["desktop", "Desktop"]].map(([v, l]) => `<option value="${v}" ${S.layout === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>Bot speed <select id="botspeed">
@@ -2402,7 +2426,7 @@ function renderGame(full) {
     renderLog(true);
   }
   const cur = g.current;
-  $("#meta").innerHTML = `${g.format === "gangline" ? `<span class="chip ok">Gangline</span>` : ""}${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No final-leg Events</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span>${deckChip("dog", "Dogs", g.dogDeck.length)}${deckChip("gear", "Gear", g.gearDeck.length)}${deckChip("event", "Events", g.eventDeck.length)}`;
+  $("#meta").innerHTML = `${g.format === "gangline" ? `<span class="chip ok">Gangline</span>` : ""}${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm && g.format !== "gangline" ? `<span class="chip">No final-leg Events</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? g.rules.lineMax + "-dog gangline" : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span>${deckChip("dog", "Dogs", g.dogDeck.length)}${deckChip("gear", "Gear", g.gearDeck.length)}${deckChip("event", "Events", g.eventDeck.length)}`;
   renderStrip();
   $("#players").innerHTML = g.players.map(p => `
     <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
@@ -3004,7 +3028,7 @@ function rulesHTML() {
   if ((g ? g.format : S.format) === "gangline") return `<h3>Long Trail · Gangline (prototype)</h3>
   <details class="rules" open><summary>Your turn</summary><ul>
     <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2. The Finish is Difficulty 5.</li>
-    <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
+    <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules.lineMax : S.gLineMax) || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line. If your line is empty, you must hitch.</li>
     <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
@@ -3171,6 +3195,9 @@ document.addEventListener("click", e => {
     case "resume": { const sv = savedRace(); if (sv) startGame(undefined, sv); break; }
     case "discardsave": clearSave(); renderSetup(); break;
     case "legreset": case "stdreset": resetToStandard(); renderSetup(); break;
+    case "fmttab": S.format = b.dataset.v === "gangline" ? "gangline" : "classic"; store.set("format", S.format); renderSetup(); break;
+    case "glinemax": S.gLineMax = +b.dataset.v; store.set("gLineMax", S.gLineMax); renderSetup(); break;
+    case "gstdreset": S.legs = [1, 2, 4]; S.gLineMax = 6; store.set("legs", S.legs); store.set("gLineMax", 6); renderSetup(); break;
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
     // game header
@@ -3283,7 +3310,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 9:17 AM";
+const LT_BUILD = "Oct 16, 9:28 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
