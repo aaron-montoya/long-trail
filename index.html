@@ -493,6 +493,7 @@ const LT = (() => {
       "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 2 extra and choose which to keep.", "When you take a trail reward, also take the top card of the Dog deck. You may hitch it in place of a dog on your gangline. Drop that dog."],
     },
     noGear: ["Red Lantern"], // nothing to do without Slog
+    gearCount: { "Headlamp": 2, "Dog Food": 4 }, // Gangline copies that differ from Classic
   };
   const G_START = { name: "Starting Chute", cost: 2 };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
@@ -577,7 +578,7 @@ const LT = (() => {
       this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
 
       this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], tt: d[6] || "", state: "rested", hardyUsed: false })));
-      this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
+      this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: this.format === "gangline" && G_ALT.gearCount[g[0]] != null ? G_ALT.gearCount[g[0]] : g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
       if (this.format === "gangline") {
         this.gearDeck = this.gearDeck.filter(g => !G_ALT.noGear.includes(g.name));
         for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; if (a[2] != null) d.rs = a[2]; if (a[3] != null) d.ts = a[3]; d.gAlt = true; } }
@@ -2283,7 +2284,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 9:41 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 10:40 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3003,7 +3004,8 @@ function zoomHTML(spec) {
   }
   if (kind === "gear") {
     const r0 = LT.GEAR.find(x => x[0] === a); if (!r0) return "";
-    const r = gAlt("gear", a) ? [r0[0], r0[1], r0[2], gAlt("gear", a)] : r0;
+    const gc = isG() && LT.G_ALT.gearCount[a] != null ? LT.G_ALT.gearCount[a] : r0[1];
+    const r = [r0[0], gc, r0[2], gAlt("gear", a) || r0[3]];
     const pd = S.pending, me = pd && pd.req.type === "action" && !pd.p.bot ? pd.p : null;
     const mine = me && me.gear.find(x => x.name === a && x.when === "free" && canUseFree(me, S.game, x));
     const why = me && me.gear.some(x => x.name === a) && !mine ? (r[2] === "run" ? "Tick it under “Gear for this Run” when you set up a Run." : r[2] === "camp" ? "Used when you Camp in the open (tick the box under Camp)." : r[2] === "slog" ? "Used when you Slog (tick the box under Slog)." : r[2] === "react" ? "You'll be asked to use it when a dog would be dropped." : "Nothing for it to do right now.") : "";
@@ -3318,7 +3320,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 9:41 AM";
+const LT_BUILD = "Oct 16, 10:40 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
