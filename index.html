@@ -477,7 +477,8 @@ const LT = (() => {
     },
     gear: {
       "Booties": "The first step of this Run doesn't tire a dog.",
-      "Dog Food": "One exhausted dog becomes rested.",
+      "Dog Food": "One dog in your gangline recovers one step.",
+      "Bivy Sack": "Play at the end of your turn: draw no end-of-turn Event.",
       "Whistle": "One tired dog becomes rested.",
       "Hot Broth": "All your tired dogs become rested.",
     },
@@ -980,7 +981,13 @@ const LT = (() => {
     async useFreeGear(p, gid, target) {
       const g = p.gear.find(x => x.id === gid);
       if (!g) return;
-      if (g.name === "Dog Food") {
+      if (g.name === "Dog Food" && this.format === "gangline") {
+        const pool = p.line.filter(x => x.state !== "rested");
+        const d = pool.find(x => x.id === target) || pool.find(x => x.state === "exh") || pool[0];
+        if (!d) return;
+        d.state = d.state === "exh" ? "tired" : "rested";
+        this.log(`${p.name} uses Dog Food: ${d.name} is ${d.state}.`, "good");
+      } else if (g.name === "Dog Food") {
         const d = p.dogs.find(x => x.id === target && x.state === "exh") || this.exh(p)[0];
         if (!d) return;
         d.state = this.rules.gDogFoodTired ? "tired" : "rested";
@@ -1320,7 +1327,8 @@ const LT = (() => {
         if (n.c.type === "T" && n.c.name === "River Ice" && p.line.filter(d => d.state !== "exh").length >= 3 && !this.shadowSafe(p)) runEvents.push("River Ice");
         const tiredNow = this.rules.gTire2 ? p.line.find(d => d.state !== "exh") : null;
         const vetB = this.rules.gVetB && p.musher === "Veteran" && !p.after && moved === 1;
-        if (!(booties && moved === 1) && !vetB) await this.gTireLead(p, "breaking trail");
+        const bootHalf = booties && moved === 1 && this.rules.gBootiesHalf;
+        if ((!(booties && moved === 1) || bootHalf) && !vetB) await this.gTireLead(p, "breaking trail");
         if (this.rules.gTire2 && !(booties && moved === 1) && !vetB) { const d2 = p.line.filter(d => d.state !== "exh" && d !== tiredNow)[0]; if (d2) await this.gTireDog(p, d2, "breaking trail"); }
         this.upd();
         // Pressing on: every step after the first draws an Event right away (not onto a checkpoint).
@@ -1390,10 +1398,6 @@ const LT = (() => {
       if (here && here.type === "CP") safe = "The checkpoint shelters the team.";
       else if (here && here.type === "T" && here.name === "Spruce Forest") safe = "The Spruce Forest shelters the team.";
       else if (p.musher === "Night Runner" && p.after) safe = "The Night Runner camps safely.";
-      else if (action.bivy) {
-        const b = p.gear.find(g => g.name === "Bivy Sack");
-        if (b) { p.gear.splice(p.gear.indexOf(b), 1); p.used.push(b); safe = "The Bivy Sack keeps everyone warm."; }
-      }
       return safe;
     }
     async applyGEvent(p, e) {
@@ -1473,6 +1477,10 @@ const LT = (() => {
       const atCP = p.pos >= 0 && this.path[p.pos].type === "CP";
       if (!quiet && atCP) quiet = "Safe at the checkpoint.";
       if (!quiet && p.gWentEv) { p.gWentEv = false; quiet = "On the move."; }
+      if (!quiet) {
+        const b = p.gear.find(g => g.name === "Bivy Sack");
+        if (b && await this.ask(p, { type: "bivyEnd" })) { p.gear.splice(p.gear.indexOf(b), 1); p.used.push(b); quiet = "The Bivy Sack keeps everyone warm."; }
+      }
       if (quiet) { if (quiet !== "Checkpoint camp") this.log(`${quiet} No Event this turn.`, "good"); }
       else await this.event(p, "the trail");
       if (p.scratched) return;
@@ -1739,7 +1747,17 @@ const LT = (() => {
       const worn = (exhN * 2 >= p.line.length && p.line.length > 0) || (g.rules.gLeadDrop && p.line[0] && p.line[0].state === "exh")
         || g.gStepSpends(p);
       const n = g.gNext(p, []);
-      if (n && n.ok && !worn) return { type: "go", gear: [] };
+      if (n && n.ok && !worn) {
+        // Booties whenever the first step would tire a rested dog; Snow Hook on Mountain Pass / Deep Powder;
+        // Snack, Wax and Golden Harness to push on the final leg
+        const gear = [];
+        const has = nm => p.gear.find(x => x.name === nm && !gear.includes(x.id));
+        const front2 = p.line.filter(d => d.state !== "exh").slice(0, 2);
+        if (has("Booties") && front2.some(d => d.state === "rested")) gear.push(has("Booties").id);
+        if (has("Snow Hook") && n.c.type === "T" && (n.c.name === "Mountain Pass" || n.c.name === "Deep Powder")) gear.push(has("Snow Hook").id);
+        if (p.pos >= g.cpIdx[1]) for (const nm of ["Snack", "Wax the Runners", "Golden Harness"]) { const x = has(nm); if (x && (nm !== "Golden Harness" || (p.line[0] && p.line[0].role === "Lead" && p.line[0].state !== "exh"))) gear.push(x.id); }
+        return { type: "go", gear };
+      }
       // a piece of gear might get the team moving
       if (!worn) for (const gg of p.gear.filter(x => x.when === "run" && x.name !== "Booties")) {
         const m = g.gNext(p, [gg]);
@@ -1753,6 +1771,7 @@ const LT = (() => {
         case "pickEvent": return HARSH[req.options[0]] <= HARSH[req.options[1]] ? 0 : 1;
         case "rookieIgnore": return HARSH[req.card] >= 4;
         case "alpineIgnore": return HARSH[req.card] >= 3 || ["Deep Snow", "Long Climb", "Cold Snap", "Steep Climb", "Tangled Lines", "Whiteout"].includes(req.card);
+        case "bivyEnd": return p.line.some(d => d.state === "exh") || p.line.filter(d => d.state === "tired").length >= 2;
         case "gContinue": {
           const f = p.line[0];
           const live = p.line.filter(d => d.state !== "exh").length;
@@ -2227,7 +2246,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 7:55 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 8:03 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2398,7 +2417,7 @@ function renderStrip() {
 }
 
 function canUseFree(p, g, gr) {
-  if (gr.name === "Dog Food") return g.exh(p).length > 0;
+  if (gr.name === "Dog Food") return g.format === "gangline" ? p.line.some(d => d.state !== "rested") : g.exh(p).length > 0;
   if (gr.name === "Whistle") return g.tired(p).length > 0;
   if (gr.name === "Hot Broth") return g.tired(p).length > 0;
   if (gr.name === "Headlamp") return g.nextFaceDown(p, 1).length > 0;
@@ -2500,7 +2519,7 @@ function renderGBoard(p, myTurn) {
   p.gear.forEach((gr, j) => {
     const runG = myTurn && gr.when === "run";
     const free = myTurn && gr.when === "free" && canUseFree(p, g, gr);
-    const isBivy = myTurn && gr.name === "Bivy Sack";
+    const isBivy = false; // Bivy Sack is offered at the end of your turn instead
     items.push(`<div class="hc ${j === 0 && hand.length ? "gap" : ""}">${gearCard(gr, { pick: runG || isBivy, sel: isBivy ? st.bivy : st.gear.has(gr.id), flag: isBivy && st.bivy ? "for camp" : "", attrs: runG ? `data-act="ggear" data-id="${gr.id}"` : isBivy ? `data-act="gbivycard"` : "" })}${free ? `<button class="usebtn" data-act="usegear" data-id="${gr.id}">Use</button>` : ""}</div>`);
   });
   el.innerHTML = `
@@ -2558,7 +2577,7 @@ function gActionsHTML(p, st) {
   if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
   if (!L.atOpenCP) h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest || mustHitch });
   h += `</div>`;
-  if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy" data-act="gbivy" ${st.bivy ? "checked" : ""}> Use Bivy Sack if you camp (no Event)</label>`;
+
   if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}" ${!st.ret.has(d.id) && st.ret.size >= p.line.length - 1 ? "disabled" : ""}>${esc(d.name)}</button>`).join("")}</div><div class="small">At least one dog stays hitched. An empty gangline is scratched.</div>`;
   if (p.line.length > 1) {
     const ord = gOrder(p, st);
@@ -2823,7 +2842,7 @@ function renderModal() {
     if (ov.type === "paused") return modal(`<div class="pass"><div class="label">Race paused</div><div class="who">⏱ ${fmt(T.active())}</div><p class="small">The clock and the bots are stopped.</p><button class="primary" data-act="pause">Resume</button></div>`);
     if (ov.type === "freepick") {
       const p = ov.p;
-      return modal(`<h3>${esc(ov.gear.name)}</h3><p class="small">${esc(ov.gear.text)} Pick a dog.</p><div class="cards">${ov.options.map(d => dogCard(d, { pick: true, attrs: `data-act="freepickdog" data-id="${d.id}"`, state: "rested" })).join("")}</div><div class="btns"><button data-act="closeov">Cancel</button></div>`);
+      return modal(`<h3>${esc(ov.gear.name)}</h3><p class="small">${esc(ov.gear.text)} Pick a dog.</p><div class="cards">${ov.options.map(d => dogCard(d, { pick: true, attrs: `data-act="freepickdog" data-id="${d.id}"`, state: isG() ? d.state : "rested", flat: true, flag: isG() ? (d.state === "exh" ? "exhausted" : d.state) : "" })).join("")}</div><div class="btns"><button data-act="closeov">Cancel</button></div>`);
     }
     if (ov.type === "artcheck") return modal(ov.html);
     if (ov.type === "zoom") return modal(zoomHTML(ov.spec) + `<div class="btns" style="margin-top:12px"><button class="primary" data-act="closezoom">Close</button></div>`);
@@ -2844,6 +2863,12 @@ function renderModal() {
       return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>
         <p class="small">Rookie: once per leg you may ignore an Event.</p>
         <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
+    case "bivyEnd": {
+      const b = p.gear.find(x => x.name === "Bivy Sack");
+      return modal(`<div class="label">${esc(p.name)} · end of turn</div><h3>Use your Bivy Sack?</h3><div class="cards">${b ? gearCard(b) : ""}</div>
+        <p>You're about to draw your end-of-turn Event. Play the Bivy Sack to draw no Event. It becomes used gear until your Long Rest.</p>
+        <div class="btns"><button data-act="pick" data-v="0">Draw the Event</button><button class="primary" data-act="pick" data-v="1">Use Bivy Sack</button></div>`);
+    }
     case "gContinue":
       return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Keep going?</h3>
         <p>Your team's Speed is now <b>${r.speed}</b>. ${esc(r.label)} has Difficulty <b>${r.cost}</b>.</p>
@@ -3172,7 +3197,7 @@ document.addEventListener("click", e => {
       const p = pd.p, gr = p.gear.find(x => x.id === id);
       if (!gr) break;
       if (gr.name === "Dog Food" || gr.name === "Whistle") {
-        const opts = gr.name === "Dog Food" ? g.exh(p) : g.tired(p);
+        const opts = gr.name === "Dog Food" ? (g.format === "gangline" ? p.line.filter(d => d.state !== "rested") : g.exh(p)) : g.tired(p);
         if (opts.length === 1) resolvePending({ type: "gear", gear: id, target: opts[0].id });
         else { S.overlay = { type: "freepick", p, gear: gr, options: opts }; renderModal(); }
       } else resolvePending({ type: "gear", gear: id });
@@ -3183,7 +3208,7 @@ document.addEventListener("click", e => {
     case "pick": if (pd) {
       const v = b.dataset.v, t = pd.req.type;
       if (t === "pickEvent") resolvePending(+v);
-      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP" || t === "alpineIgnore" || t === "gContinue") resolvePending(v === "1");
+      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP" || t === "alpineIgnore" || t === "gContinue" || t === "bivyEnd") resolvePending(v === "1");
       else resolvePending(v);
     } break;
     case "keeptoggle": if (pd) {
@@ -3223,7 +3248,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 7:55 AM";
+const LT_BUILD = "Oct 16, 8:03 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
