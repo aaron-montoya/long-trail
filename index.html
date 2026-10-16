@@ -312,6 +312,14 @@ html.phone .acts .act span { font-size: 12px; }
 .deckc { display: inline-flex; align-items: center; gap: 4px; }
 .deckc img { height: 24px; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
 .panel.resume { border-color: var(--accent); }
+.gline .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.gslot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.gpos { font-size: 11px; color: var(--muted); }
+.gspeed { display: flex; gap: 18px; align-items: baseline; margin: 8px 0 2px; }
+.gspeed .big { font-size: 26px; }
+.row2 { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chipbtn { font-size: 12px; padding: 3px 9px; border-radius: 12px; }
+.chipbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .panel.resume p { margin: 4px 0 8px; }
 .seat .keptline { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .seat .keptline .ghost { padding: 1px 8px; font-size: 12px; }
@@ -433,7 +441,22 @@ const LT = (() => {
     ["Steep Climb", 1, "All your tired dogs become exhausted."],
     ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
   ];
+  // Gangline mode (prototype): one Event every turn, aimed at the team on the table.
+  const G_EVENTS = [
+    ["Deep Snow", 4, "Your Lead dog becomes tired."],
+    ["Long Climb", 3, "Every rested Team dog in your line becomes tired."],
+    ["Cold Snap", 4, "One tired dog in your line becomes exhausted."],
+    ["Steep Climb", 1, "Every tired dog in your line becomes exhausted."],
+    ["Tangled Lines", 2, "Move your Lead dog to the back of your line."],
+    ["Bitter Cold", 4, "Drop an exhausted dog. If you have none, one tired dog becomes exhausted."],
+    ["Blizzard", 2, "Drop an exhausted dog. Then move back one trail, but never past a checkpoint."],
+    ["Whiteout", 1, "You can't Go on your next turn."],
+    ["Second Wind", 2, "One tired dog in your line becomes rested."],
+    ["Tailwind", 2, "Keep this card. Your next Go gets +2 Speed, then discard it."],
+    ["Clear Skies", 2, "No effect."],
+  ];
   const EVENT_TEXT = Object.fromEntries(EVENTS.map(e => [e[0], e[2]]));
+  const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
   const HARSH = {
     "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
     "Moose on the Trail": 5, "Steep Climb": 5, "Whiteout": 6, "Bitter Cold": 7, "Squirrel!": 7, "Blizzard": 8,
@@ -475,6 +498,7 @@ const LT = (() => {
       this.io = opts.io || {};
       this.seed = opts.seed ?? Math.floor(Math.random() * 1e9);
       this.mode = opts.mode || "standard";
+      this.format = opts.format === "gangline" ? "gangline" : "classic";
       this.rules = opts.rules || {};
       this.r = rng(this.seed);
       this.round = 0;
@@ -500,7 +524,7 @@ const LT = (() => {
 
       this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], tt: d[6] || "", state: "rested", hardyUsed: false })));
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
-      this.eventDeck = this.shuffle(EVENTS.flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
+      this.eventDeck = this.shuffle((this.format === "gangline" ? G_EVENTS : EVENTS).flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
       this.eventDiscard = [];
 
       const pool = this.shuffle(MUSHER_NAMES.slice());
@@ -511,7 +535,7 @@ const LT = (() => {
           dogs: [], gear: [], used: [], lost: [], pos: -1, camped: new Set(), longRested: false,
           skip: 0, flipAfterSkip: false, after: false, runBonus: 0, costMod: 0, keptEvents: [],
           campedLast: false, scratched: false, slogLegs: new Set(), rookieLegs: new Set(), ignoreLeft: 0,
-          shadowTurn: false, turns: 0 };
+          shadowTurn: false, turns: 0, line: [], noGo: false, hitched: false };
       });
       this.players.forEach(p => { if (!p.musher) p.musher = pool.pop(); });
       // Carry-over: kept cards come out of the decks before anything is dealt.
@@ -534,6 +558,8 @@ const LT = (() => {
         for (let j = 0; j < base + (opts.seatGear ? (opts.seatGear[i] || 0) : i); j++) if (this.gearDeck.length) p.gear.push(this.gearDeck.pop());
       });
       this.players.forEach(p => { if (p.keptStart.length) this.log(`${p.name} starts with kept cards: ${p.keptStart.join(", ")}.`, "good"); });
+      // Gangline: your starting dogs begin hitched up, best Lead in front and a Wheel at the back
+      if (this.format === "gangline") this.players.forEach(p => { p.line = Bot.arrange(p.dogs.map(d => ({ dog: d, st: "rested" }))).map(x => x.dog); });
     }
 
     shuffle(a) {
@@ -600,8 +626,8 @@ const LT = (() => {
     leadBonus(p, line, gearSel) {
       if (!line.length) return 0;
       const f = line[0];
-      if (f.dog.role !== "Lead") return 0; // roles count rested or tired; abilities only when rested
-      if (line.length < 2) return 0; // a Lead needs at least one dog behind it
+      if (f.dog.role !== "Lead" || f.st === "exh") return 0; // roles count rested or tired (never exhausted); abilities only when rested
+      if (line.filter(y => y.st !== "exh").length < 2) return 0; // a Lead needs at least one dog behind it
       let b = f.dog.ab === "comet" && (f.st === "rested" || f.dog.tt) ? 2 : 1;
       if (b && p.musher === "Champion" && !p.after) b += 1;
       if (gearSel.some(g => g.name === "Golden Harness")) b *= 2;
@@ -611,14 +637,16 @@ const LT = (() => {
       const parts = [];
       let total = 0;
       const add = (v, why) => { if (v) { total += v; parts.push([why, v]); } };
+      const runN = line.filter(y => y.st !== "exh").length;
       line.forEach((x, i) => {
         const d = x.dog;
+        if (x.st === "exh") { parts.push([`${d.name} (exhausted)`, 0]); return; }
         if (x.st === "tired") { add(d.ts, `${d.name} (tired)`); return; }
         let v = d.rs;
         if (d.ab === "mitts" && i > 0 && line[i - 1].dog.role === "Lead") v += 2;
         if (d.ab === "echo" && !line.some(y => y.st === "tired")) v += 2;
-        if (d.ab === "packer") v += line.length - 1;
-        if (d.ab === "anvil" && line.length >= 4) v += 2;
+        if (d.ab === "packer") v += runN - 1;
+        if (d.ab === "anvil" && runN >= 4) v += 2;
         if (d.ab === "underdog" && this.players.some(q => q !== p && !q.scratched && q.pos > p.pos)) v += 2;
         if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
         if (d.ab === "aurora" && p.pos >= 0 && this.finalLeg(p.pos)) v += 2;
@@ -626,7 +654,7 @@ const LT = (() => {
       });
       add(this.leadBonus(p, line, gearSel), "Lead bonus");
       const w = line[line.length - 1];
-      if (w && w.dog.role === "Wheel" && line.length >= 2) add(w.dog.ab === "yukon" ? 2 : 1, "Wheel bonus"); // a Wheel needs at least one dog ahead of it; Yukon's +2 is printed on both halves
+      if (w && w.st !== "exh" && w.dog.role === "Wheel" && runN >= 2) add(w.dog.ab === "yukon" ? 2 : 1, "Wheel bonus"); // a Wheel needs at least one dog ahead of it; Yukon's +2 is printed on both halves
       const m = p.musher, af = p.after;
       if (m === "Sprinter") add(af ? 1 : 2, "Sprinter");
       if (m === "Champion" && af) add(2, "Champion");
@@ -739,7 +767,8 @@ const LT = (() => {
         }
       }
       await this.tell(p, { type: "event", card: e, source });
-      await this.applyEvent(p, e);
+      if (this.format === "gangline") await this.applyGEvent(p, e);
+      else await this.applyEvent(p, e);
       this.upd();
     }
     async applyEvent(p, e) {
@@ -832,6 +861,7 @@ const LT = (() => {
         }
       }
       p.dogs.splice(p.dogs.indexOf(v), 1);
+      if (p.line.includes(v)) p.line.splice(p.line.indexOf(v), 1);
       v.state = "removed";
       p.lost.push(v);
       this.stats.removed++;
@@ -1141,6 +1171,191 @@ const LT = (() => {
       this.upd();
     }
 
+    // =================== Gangline mode (prototype) ===================
+    gLine(p) { return p.line.map(d => ({ dog: d, st: d.state })); }
+    gHand(p) { return p.dogs.filter(d => !p.line.includes(d)); }
+    gSpeed(p, gearSel = []) { return this.speedOf(p, this.gLine(p), gearSel); }
+    // Can the team step onto the next trail right now?
+    gNext(p, gearSel = []) {
+      const nxt = p.pos + 1;
+      if (nxt >= this.path.length) return null;
+      if (p.pos >= 0 && this.path[p.pos].type === "CP" && !this.canPassCP(p, p.pos)) return null;
+      const c = this.path[nxt];
+      const line = this.gLine(p);
+      const tank = line.some(x => x.dog.ab === "heavy" && x.st !== "exh");
+      const sp = this.speedOf(p, line, gearSel).total;
+      if (c.type === "T" && !c.up) return { nxt, c, speed: sp, cost: null, ok: false, hidden: true };
+      const cost = this.trailCost(p, nxt, line, gearSel);
+      const blocked = c.type === "T" && c.name === "River Ice" && tank;
+      return { nxt, c, speed: sp, cost, ok: !blocked && sp >= cost, blocked };
+    }
+    gTire(d) {
+      if (d.state === "rested") d.state = "tired";
+      else if (d.state === "tired") d.state = "exh";
+    }
+    async gTireLead(p, why) {
+      const f = p.line[0];
+      if (!f) return;
+      if (f.state === "tired" && f.ab === "northstar") { // Chappell: returns to your hand instead of becoming exhausted
+        p.line.shift(); f.state = "rested";
+        this.log(`${f.name} trots back to ${p.name}'s hand.`, "good");
+        return;
+      }
+      const was = f.state;
+      this.gTire(f);
+      if (f.state !== was) this.log(`${f.name} ${f.state === "tired" ? "tires" : "is exhausted"} (${why}).`, f.state === "exh" ? "bad" : "");
+    }
+    gHitch(p, id, end) {
+      if (p.hitched) return;
+      const d = this.gHand(p).find(x => x.id === id);
+      if (!d) return;
+      if (this.rules.lineMax && p.line.length >= this.rules.lineMax) return;
+      d.state = "rested";
+      if (end === "front") p.line.unshift(d); else p.line.push(d);
+      p.hitched = true;
+      this.log(`${p.name} hitches ${d.name} at the ${end === "front" ? "front" : "back"}.`, "act");
+      this.upd();
+    }
+    async gGo(p, action) {
+      const gearSel = (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean);
+      for (const g of gearSel) { p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g); }
+      const booties = gearSel.some(g => g.name === "Booties");
+      const line0 = this.gLine(p);
+      if (line0.some(x => x.dog.ab === "ignore1" && (x.st === "rested" || (x.st !== "exh" && x.dog.tt)))) p.ignoreLeft = 1;
+      p.shadowTurn = line0.some(x => x.st === "rested" && x.dog.ab === "shadow");
+      const start = p.pos;
+      let moved = 0;
+      const runEvents = [];
+      this.log(`${p.name} sets off: Speed ${this.gSpeed(p, gearSel).total}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}.`, "act");
+      while (!this.over && !p.scratched) {
+        const n = this.gNext(p, gearSel);
+        if (!n || !n.ok) break;
+        if (moved > 0) {
+          const go = await this.ask(p, { type: "gContinue", speed: n.speed, cost: n.cost, next: n.nxt, label: this.label(n.nxt) });
+          if (!go) break;
+        }
+        p.pos = n.nxt; moved++;
+        this.onMoveOnto(n.nxt);
+        if (n.c.type === "F") {
+          this.winner = p; this.over = true;
+          this.log(`${p.name} crosses the Finish and wins the Long Trail!`, "win");
+          this.upd();
+          return;
+        }
+        if (n.c.type === "CP") { this.log(`${p.name} reaches Checkpoint ${n.c.cp}.`, "act"); await this.vetCheck(p, n.nxt); }
+        if (n.c.type === "T" && n.c.name === "River Ice" && p.line.filter(d => d.state !== "exh").length >= 3 && !this.shadowSafe(p)) runEvents.push("River Ice");
+        if (!booties) await this.gTireLead(p, "breaking trail");
+        this.upd();
+      }
+      if (moved) this.log(`${p.name} moves from ${this.label(start)} to ${this.label(p.pos)}.`, "act");
+      if (!p.scratched && moved) {
+        let at = p.pos;
+        if (this.path[at] && this.path[at].type === "CP" && at - 1 > start && this.path[at - 1].type === "T") at = at - 1;
+        await this.claim(p, line0, at);
+      }
+      p.runBonus = 0; p.costMod = 0; p.keptEvents = []; p.campedLast = false;
+      for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
+      if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
+        const opts = p.used.map(g => g.id);
+        const id = await this.ask(p, { type: "tinker", options: opts });
+        const g = p.used.find(x => x.id === id) || p.used[0];
+        p.used.splice(p.used.indexOf(g), 1); p.gear.push(g);
+        this.log(`Tinker fixes up ${g.name}: back in hand.`, "good");
+      }
+      if (!p.scratched && line0[0] && line0[0].st === "rested" && line0[0].dog.ab === "scout") {
+        const ids = this.nextFaceDown(p, 1);
+        if (ids.length) { this.log(`${p.name}'s Scout looks at the trail ahead.`, ""); await this.tell(p, { type: "peek", trails: ids, source: "Scout" }); }
+      }
+      for (const src of runEvents) { if (p.scratched) break; await this.event(p, src); }
+    }
+    // Camp in the open: every dog in the line recovers one step; you may send dogs back to your hand.
+    async gCamp(p, action) {
+      p.campedLast = true;
+      const here = p.pos >= 0 ? this.path[p.pos] : null;
+      this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
+      if (p.musher === "Trapper" && p.after) await this.drawDogs(p, 1, 1, "Trapper");
+      for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
+      const back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
+      for (const d of back) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; }
+      if (back.length) this.log(`${p.name} brings ${back.map(d => d.name).join(", ")} back to hand.`, "");
+      const cocoa = this.gHand(p).some(d => d.ab === "cocoa");
+      if (cocoa && p.used.length) {
+        const id = await this.ask(p, { type: "tinker", options: p.used.map(g => g.id), source: "Cocoa" });
+        const g = p.used.find(x => x.id === id) || p.used[0];
+        p.used.splice(p.used.indexOf(g), 1); p.gear.push(g);
+        this.log(`Cocoa curls up by the fire. ${g.name} is back in hand.`, "good");
+      }
+      let safe = null;
+      if (here && here.type === "T" && here.name === "Spruce Forest") safe = "The Spruce Forest shelters the team.";
+      else if (p.musher === "Night Runner" && p.after) safe = "The Night Runner camps safely.";
+      else if (action.bivy) {
+        const b = p.gear.find(g => g.name === "Bivy Sack");
+        if (b) { p.gear.splice(p.gear.indexOf(b), 1); p.used.push(b); safe = "The Bivy Sack keeps everyone warm."; }
+      }
+      return safe;
+    }
+    async applyGEvent(p, e) {
+      const line = p.line;
+      const pickLine = async (pred, why) => {
+        const pool = line.filter(pred);
+        if (!pool.length) return null;
+        const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "exhaustDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: why });
+        return pool.find(d => d.id === id) || pool[0];
+      };
+      const dropExh = async () => {
+        let pool = line.filter(d => d.state === "exh");
+        const flash = line.filter(d => d.ab === "fragile" && d.state !== "rested");
+        if (flash.length) pool = flash;
+        if (!pool.length) return false;
+        const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: flash.length ? "Flash is tired or exhausted, so Flash must go." : "Choose an exhausted dog." });
+        await this.dropDog(p, pool.find(d => d.id === id) || pool[0], e);
+        return true;
+      };
+      switch (e) {
+        case "Deep Snow": { const f = line[0]; if (f && f.state === "rested") { f.state = "tired"; this.log(`${f.name} tires in the deep snow.`, "bad"); } break; }
+        case "Long Climb": { const t = line.filter(d => d.role === "Team" && d.state === "rested"); t.forEach(d => d.state = "tired"); if (t.length) this.log(`${t.map(d => d.name).join(", ")} tire${t.length === 1 ? "s" : ""} on the climb.`, "bad"); break; }
+        case "Cold Snap": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
+        case "Steep Climb": line.filter(d => d.state === "tired").forEach(d => d.state = "exh"); break;
+        case "Tangled Lines": if (line.length > 1) { const f = line.shift(); line.push(f); this.log(`${f.name} ends up at the back of the line.`, "bad"); } break;
+        case "Bitter Cold": if (!(await dropExh())) { const d = await pickLine(d => d.state === "tired", "No exhausted dogs: choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } } break;
+        case "Blizzard": await dropExh(); if (!p.scratched) this.moveBack(p); break;
+        case "Whiteout": p.noGo = true; this.log(`${p.name} can't Go next turn.`, "bad"); break;
+        case "Second Wind": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to rest."); if (d) { d.state = "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
+        case "Tailwind": p.runBonus += 2; p.keptEvents.push(e); break;
+        default: break;
+      }
+      this.upd();
+    }
+    async gTurn(p) {
+      if (this.io.turnStart) await this.io.turnStart(p);
+      p.hitched = false;
+      const noGo = p.noGo; p.noGo = false;
+      let action;
+      for (let guard = 0; guard < 30; guard++) {
+        action = p.bot ? Bot.gAction(this, p, noGo) : await this.io.ask(p, { type: "action", noGo });
+        if (action.type === "hitch") { this.gHitch(p, action.id, action.end); continue; }
+        if (action.type === "gear") { await this.useFreeGear(p, action.gear, action.target); continue; }
+        break;
+      }
+      const here = p.pos >= 0 ? this.path[p.pos] : null;
+      const atOpenCP = here && here.type === "CP" && !p.camped.has(here.cp);
+      const mustLong = atOpenCP && here.cp === 2 && !p.longRested;
+      if (action.type === "go" && (noGo || !(this.gNext(p, (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean)) || {}).ok)) action = { type: "camp" };
+      if (action.type === "cp" && !atOpenCP) action = { type: "camp" };
+      if (mustLong && action.type !== "cp") action = { type: "cp", long: true };
+      if (p.pos >= this.cpIdx[1] && action.type !== "cp") p.finalTurns = (p.finalTurns || 0) + 1;
+      let quiet = null;
+      if (action.type === "go") await this.gGo(p, action);
+      else if (action.type === "cp") { await this.doCampCP(p, !!action.long); quiet = "Checkpoint camp"; }
+      else quiet = await this.gCamp(p, action);
+      if (this.over || p.scratched) return;
+      if (quiet) { if (quiet !== "Checkpoint camp") this.log(`${quiet} No Event this turn.`, "good"); }
+      else await this.event(p, "the trail");
+      if (p.scratched) return;
+      const at = p.pos >= 0 ? this.path[p.pos] : null;
+      if (at && at.type === "T" && at.name === "Exposed Ridge" && !this.shadowSafe(p)) await this.event(p, "Exposed Ridge");
+    }
+
     // ---------- main loop ----------
     async turn(p) {
       p.turns++;
@@ -1154,6 +1369,7 @@ const LT = (() => {
         this.upd();
         return;
       }
+      if (this.format === "gangline") return this.gTurn(p);
       if (this.io.turnStart) await this.io.turnStart(p);
       if (!this.rules.noStorm && p.pos >= 0 && this.path[p.pos].type === "T" && this.finalLeg(p.pos)) {
         const k = this.rules.stormScale ? Math.max(1, Math.ceil(p.dogs.length / this.rules.stormScale)) : 1;
@@ -1333,12 +1549,52 @@ const LT = (() => {
       if (Bot.est(g, p, allRested) >= 1 || !L.canSlog) return { type: "camp", bivy: !!p.gear.find(x => x.name === "Bivy Sack") };
       return { type: "slog", lantern };
     },
+    // Gangline mode: hitch the best dog, Go when the team can, camp when it's worn out.
+    gAction(g, p, noGo) {
+      const L = g.legal(p);
+      if (L.atOpenCP) {
+        if (L.mustLongRest) return { type: "cp", long: true };
+        if (!p.longRested && (p.musher === "Rookie" || p.musher === "Champion" || p.dogs.length < 4)) return { type: "cp", long: true };
+        return { type: "cp", long: false };
+      }
+      const hand = g.gHand(p);
+      if (!p.hitched && hand.length && (!g.rules.lineMax || p.line.length < g.rules.lineMax)) {
+        const d = hand.slice().sort((a, b) => dogVal(b) - dogVal(a))[0];
+        const f = p.line[0];
+        const end = d.role === "Lead" && (!f || f.role !== "Lead" || f.state !== "rested") ? "front" : (!f || f.state === "exh") && d.role !== "Wheel" ? "front" : "back";
+        return { type: "hitch", id: d.id, end };
+      }
+      const tiredN = p.line.filter(d => d.state === "tired").length, exhN = p.line.filter(d => d.state === "exh").length;
+      for (const [nm, ok] of [["Hot Broth", tiredN >= 2], ["Dog Food", exhN >= 1], ["Whistle", tiredN >= 1]]) {
+        const gg = p.gear.find(x => x.name === nm);
+        if (gg && ok) {
+          const target = nm === "Dog Food" ? p.line.find(d => d.state === "exh") : p.line.find(d => d.state === "tired");
+          return { type: "gear", gear: gg.id, target: target && target.id };
+        }
+      }
+      const bivy = !!p.gear.find(x => x.name === "Bivy Sack");
+      if (noGo) return { type: "camp", bivy };
+      const worn = exhN * 2 >= p.line.length && p.line.length > 0;
+      const n = g.gNext(p, []);
+      if (n && n.ok && !worn) return { type: "go", gear: [] };
+      // a piece of gear might get the team moving
+      if (!worn) for (const gg of p.gear.filter(x => x.when === "run" && x.name !== "Booties")) {
+        const m = g.gNext(p, [gg]);
+        if (m && m.ok) return { type: "go", gear: [gg.id] };
+      }
+      return { type: "camp", bivy };
+    },
     answer(g, p, req) {
       const byId = id => p.dogs.find(d => d.id === id) || g.dogDeck.find(d => d.id === id);
       switch (req.type) {
         case "pickEvent": return HARSH[req.options[0]] <= HARSH[req.options[1]] ? 0 : 1;
         case "rookieIgnore": return HARSH[req.card] >= 4;
-        case "alpineIgnore": return HARSH[req.card] >= 3;
+        case "alpineIgnore": return HARSH[req.card] >= 3 || ["Deep Snow", "Long Climb", "Cold Snap", "Steep Climb", "Tangled Lines", "Whiteout"].includes(req.card);
+        case "gContinue": {
+          const f = p.line[0];
+          const live = p.line.filter(d => d.state !== "exh").length;
+          return !f || f.state === "rested" || live >= 4 || g.path[req.next].type !== "T";
+        }
         case "removeDog": return req.options.map(byId).sort((a, b) => (a.rs + a.ts) - (b.rs + b.ts))[0].id;
         case "exhaustDog": return req.options.map(byId).sort((a, b) => a.ts - b.ts)[0].id;
         case "keepDogs": {
@@ -1362,7 +1618,7 @@ const LT = (() => {
       }
     },
   };
-  return { Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
+  return { Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, G_EVENTS, G_EVENT_TEXT, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
 })();
 
 
@@ -1521,10 +1777,12 @@ function gearCard(g, o = {}) {
   const card = `<div class="${cls}" ${o.attrs || ""} data-zoom="${esc("gear|" + g.name)}" title="${esc(g.name + ": " + g.text)}">${inner}${o.flag ? `<span class="stateflag">${esc(o.flag)}</span>` : ""}${zb(o, "gear|" + g.name)}</div>`;
   return o.used ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
 }
+const isG = () => !!(S.game && S.game.format === "gangline");
+const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : evText(e)) || "";
 function eventCard(e, o = {}) {
-  const url = artFor(artKeys.event(e));
-  const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(e)}</div><div class="cs">Event</div><div class="cx">${esc(LT.EVENT_TEXT[e])}</div>`;
-  return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + LT.EVENT_TEXT[e])}">${inner}${zb(o, "event|" + e)}</div>`;
+  const url = isG() ? null : artFor(artKeys.event(e));
+  const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(e)}</div><div class="cs">Event</div><div class="cx">${esc(evText(e))}</div>`;
+  return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + evText(e))}">${inner}${zb(o, "event|" + e)}</div>`;
 }
 function musherCard(p, o = {}) {
   const url = artFor(artKeys.musher(p.musher));
@@ -1558,6 +1816,7 @@ function trailCard(c, i, o = {}) {
 // ---------------- App state ----------------
 const S = {
   screen: "setup",
+  format: store.get("format", "classic"),
   seats: store.get("seats", [
     { name: "Aaron", bot: false, musher: "Random" },
     { name: "Bot Kit", bot: true, musher: "Random" },
@@ -1705,7 +1964,7 @@ async function startGame(seed, resume) {
   else {
     const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
     store.set("seats", S.seats);
-    opts = { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice() };
+    opts = { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice(), format: S.format };
   }
   const io = makeIO();
   S.game = new LT.Game({ ...opts, io });
@@ -1797,7 +2056,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 7:09 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 10:48 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -1817,7 +2076,12 @@ function renderSetup() {
     <div class="panel">
       ${(() => { const isStd = S.legs.join("-") === "1-2-4" && S.mode !== "generous" && S.rules.lineMax === 6 && S.rules.noHarsh && !S.rules.noStorm && !S.rules.vetCheck && !S.rules.bigLine && !S.rules.finalRunMax && !S.rules.handLimit;
         return `<div class="stdline">${isStd ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · standard checkpoints · 6-dog gangline · an Event each turn on the final leg · no harsh weather</span>` : `<span class="chip warn">Custom rules</span><button data-act="stdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>`; })()}
-      <div class="label">Trail layout</div>
+      <div class="label">Game format</div>
+      <div class="modes">
+        <label><input type="radio" name="format" value="classic" ${S.format !== "gangline" ? "checked" : ""}> <span><b>Classic</b><small>Build a team from your hand each turn and run it as far as its Speed takes you.</small></span></label>
+        <label><input type="radio" name="format" value="gangline" ${S.format === "gangline" ? "checked" : ""}> <span><b>Gangline (prototype)</b><small>Your team stays on the table. Each turn: hitch one dog at the front or back, then Go (one trail at a time, your Lead tires each step, keep going while your Speed covers the next trail) or Camp (every dog recovers one step). Then draw one Event.</small></span></label>
+      </div>
+      <div class="label" style="margin-top:14px">Trail layout</div>
       <div class="legs">
         ${["Before Checkpoint 1", "Between the checkpoints", "Final leg"].map((t, i) => `<label><span>${t}</span><select data-leg="${i}">${[1, 2, 3, 4, 5, 6].map(v => `<option ${S.legs[i] == v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}
         <span class="small legtotal">${S.legs.reduce((a, b) => a + b, 0)} trails · standard is 1-2-4</span>
@@ -1867,6 +2131,21 @@ function playerChips(p) {
   const g = S.game;
   const chips = [];
   chips.push(`<span class="chip">${esc(g.label(p.pos))}</span>`);
+  if (g.format === "gangline") {
+    const t = p.line.filter(d => d.state === "tired").length, x = p.line.filter(d => d.state === "exh").length;
+    chips.push(`<span class="chip">line ${p.line.length} · Speed ${g.gSpeed(p).total}</span>`);
+    if (t) chips.push(`<span class="chip">${t} tired</span>`);
+    if (x) chips.push(`<span class="chip warn">${x} exhausted</span>`);
+    chips.push(`<span class="chip">${g.gHand(p).length} in hand</span>`);
+    chips.push(`<span class="chip">${p.gear.length} gear${p.used.length ? ` · ${p.used.length} used` : ""}</span>`);
+    if (p.longRested) chips.push(`<span class="chip ok">Long Rest done</span>`);
+    if (p.skip) chips.push(`<span class="chip warn">skips next turn</span>`);
+    if (p.noGo) chips.push(`<span class="chip warn">can't Go next turn</span>`);
+    if (p.keptEvents.length) chips.push(`<span class="chip">${p.keptEvents.map(esc).join(", ")}</span>`);
+    if (p.lost.length) chips.push(`<span class="chip warn">dropped ${p.lost.length}</span>`);
+    if (p.scratched) chips.push(`<span class="chip warn">scratched</span>`);
+    return chips.join("");
+  }
   chips.push(`<span class="chip">${g.rested(p).length} in hand</span>`);
   if (g.tired(p).length) chips.push(`<span class="chip">${g.tired(p).length} tired</span>`);
   if (g.exh(p).length) chips.push(`<span class="chip warn">${g.exh(p).length} exhausted</span>`);
@@ -1907,7 +2186,7 @@ function renderGame(full) {
     renderLog(true);
   }
   const cur = g.current;
-  $("#meta").innerHTML = `${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No final-leg Events</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span>${deckChip("dog", "Dogs", g.dogDeck.length)}${deckChip("gear", "Gear", g.gearDeck.length)}${deckChip("event", "Events", g.eventDeck.length)}`;
+  $("#meta").innerHTML = `${g.format === "gangline" ? `<span class="chip ok">Gangline</span>` : ""}${g.legs.join("-") !== "1-2-4" ? `<span class="chip">Trails ${g.legs.join("-")}</span>` : ""}${g.mode === "generous" ? `<span class="chip">Well-stocked checkpoints</span>` : ""}${g.rules.noStorm ? `<span class="chip">No final-leg Events</span>` : ""}${!g.rules.noHarsh ? `<span class="chip">Harsh weather</span>` : ""}${g.rules.lineMax !== 6 ? `<span class="chip">${g.rules.lineMax ? "Gangline " + g.rules.lineMax : "No gangline limit"}</span>` : ""}${g.rules.vetCheck ? `<span class="chip">Vet check</span>` : ""}${g.rules.bigLine ? `<span class="chip">Heavy sled</span>` : ""}<span>Round <b>${g.round}</b></span><span>${cur ? `Turn: <b style="color:${cur.color}">${esc(cur.name)}</b>` : ""}</span>${deckChip("dog", "Dogs", g.dogDeck.length)}${deckChip("gear", "Gear", g.gearDeck.length)}${deckChip("event", "Events", g.eventDeck.length)}`;
   renderStrip();
   $("#players").innerHTML = g.players.map(p => `
     <div class="pl ${cur === p ? "now" : ""} ${p.scratched ? "out" : ""}" style="--pc:${p.color}">
@@ -1972,6 +2251,7 @@ function renderBoard() {
     rp.innerHTML = `<div class="waiting" style="padding:8px">${g.over ? "Race over." : "Waiting for the next musher."}</div>`;
     return;
   }
+  if (g.format === "gangline") return renderGBoard(p, myTurn);
   const rested = g.rested(p), tired = g.tired(p), exh = g.exh(p);
   const run = myTurn ? S.run : null;
   const inLine = id => !!(run && run.line.includes(id));
@@ -2022,6 +2302,83 @@ function renderBoard() {
 
   if (myTurn) rp.innerHTML = run ? runPanelHTML(p) : actionsHTML(p);
   else rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`;
+}
+
+
+// ---------------- Gangline mode board ----------------
+function gState() { return S.g || (S.g = { sel: null, gear: new Set(), ret: new Set() }); }
+function renderGBoard(p, myTurn) {
+  const g = S.game, el = $("#board"), rp = $("#runpanel");
+  const st = myTurn ? gState() : { sel: null, gear: new Set(), ret: new Set() };
+  const hand = g.gHand(p);
+  const stName = d => d.state === "rested" ? "rested" : d.state === "tired" ? "tired" : "exhausted";
+  const canHitch = myTurn && !p.hitched && hand.length && (!g.rules.lineMax || p.line.length < g.rules.lineMax);
+  const lineHTML = p.line.map((d, i) => `<div class="gslot">${dogCard(d, { flag: stName(d) })}<div class="gpos">${i === 0 ? "Front · Lead" : i === p.line.length - 1 ? "Back · Wheel" : "#" + (i + 1)}</div></div>`).join("");
+  const tz = [];
+  if (p.used.length) tz.push(`<div class="tz"><div class="label">Used gear · back at your Long Rest</div><div class="row">${p.used.map(gr => gearCard(gr, { used: true })).join("")}</div></div>`);
+  if (p.keptEvents.length) tz.push(`<div class="tz"><div class="label">Kept Events · next Go</div><div class="row">${p.keptEvents.map(e => eventCard(e)).join("")}</div></div>`);
+  const items = [];
+  hand.forEach(d => items.push(`<div class="hc">${dogCard(d, { pick: !!canHitch, sel: st.sel === d.id, attrs: canHitch ? `data-act="gsel" data-id="${d.id}"` : "", state: "rested" })}</div>`));
+  p.gear.forEach((gr, j) => {
+    const runG = myTurn && gr.when === "run";
+    const free = myTurn && gr.when === "free" && canUseFree(p, g, gr);
+    items.push(`<div class="hc ${j === 0 && hand.length ? "gap" : ""}">${gearCard(gr, { pick: runG, sel: st.gear.has(gr.id), attrs: runG ? `data-act="ggear" data-id="${gr.id}"` : "" })}${free ? `<button class="usebtn" data-act="usegear" data-id="${gr.id}">Use</button>` : ""}</div>`);
+  });
+  el.innerHTML = `
+    <div class="musherrow">
+      ${musherCard(p)}
+      <div class="mtext">
+        <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
+        <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · dropped: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
+        <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(LT.MUSHERS[p.musher][0])}</div>
+        <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(LT.MUSHERS[p.musher][1])}</div>
+      </div>
+    </div>
+    <div class="tableau gline" aria-label="Your gangline"><div class="tz"><div class="label">Your gangline · front to back · Speed ${g.gSpeed(p, [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean)).total}</div><div class="row">${lineHTML || `<span class="empty">No dogs hitched.</span>`}</div></div>${tz.join("")}</div>
+    <div class="handzone">
+      <div class="label">Your hand · ${hand.length} dog${hand.length === 1 ? "" : "s"}, ${p.gear.length} gear${canHitch ? " · tap a dog to hitch it" : ""}</div>
+      <div class="hand" id="hand">${items.join("") || `<span class="empty">Your hand is empty.</span>`}</div>
+    </div>`;
+  if (!myTurn) { rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`; return; }
+  rp.innerHTML = gActionsHTML(p, st);
+}
+function gActionsHTML(p, st) {
+  const g = S.game, pd = S.pending, noGo = !!(pd && pd.req.noGo);
+  const L = g.legal(p);
+  const gearSel = [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
+  const sp = g.gSpeed(p, gearSel), n = g.gNext(p, gearSel);
+  const hand = g.gHand(p);
+  const here = p.pos >= 0 ? g.path[p.pos] : null;
+  const bivy = p.gear.find(x => x.name === "Bivy Sack");
+  const safeCamp = (here && here.type === "T" && here.name === "Spruce Forest") || (p.musher === "Night Runner" && p.after);
+  const btn = (act, title, sub, o = {}) => `<button class="act ${o.primary ? "primary" : ""}" data-act="${act}" ${o.disabled ? "disabled" : ""}><b>${title}</b><span>${sub}</span></button>`;
+  let h = `<h3>Your turn</h3><div class="small">${esc(g.label(p.pos))}</div>`;
+  h += `<div class="gspeed"><div><span class="small">Team Speed</span> <b class="big">${sp.total}</b></div>`;
+  if (n && n.cost != null) h += `<div><span class="small">${esc(g.label(n.nxt))}</span> <b class="big">${n.cost}</b></div>`;
+  h += `</div><div class="small">${sp.parts.map(([w, v]) => `${esc(w)} ${v >= 0 ? "+" : ""}${v}`).join(" · ") || "No dogs hitched."}</div>`;
+  if (!p.hitched && hand.length && (!g.rules.lineMax || p.line.length < g.rules.lineMax)) {
+    h += `<div class="label" style="margin-top:10px">1 · Hitch a dog (optional)</div>`;
+    h += st.sel ? `<div class="row2"><button data-act="ghitch" data-v="front">At the front</button><button data-act="ghitch" data-v="back">At the back</button><button class="ghost" data-act="gsel" data-id="${st.sel}">Cancel</button></div>`
+      : `<div class="small">Tap a dog in your hand, then choose front or back.</div>`;
+  } else h += `<div class="small" style="margin-top:8px">${p.hitched ? "You've hitched a dog this turn." : hand.length ? "Your line is full." : "No dogs in hand to hitch."}</div>`;
+  h += `<div class="label" style="margin-top:10px">2 · Go or Camp</div><div class="acts">`;
+  if (L.atOpenCP) {
+    h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, "Every dog rests. Take the top dog and gear. No Event.", { disabled: L.mustLongRest });
+    h += btn("longrest", "Long Rest", "Every dog rests, used gear returns, draw 2 dogs keep 1 and 2 gear keep 1, then skip a turn. No Event.", { primary: L.mustLongRest });
+  }
+  let goSub;
+  if (noGo) goSub = "Whiteout: you can't Go this turn.";
+  else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
+  else if (n.blocked) goSub = "Tank won't step onto River Ice.";
+  else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
+  else goSub = `Move onto ${g.label(n.nxt)}. Your Lead tires. Keep going while your Speed covers the next trail.`;
+  h += btn("ggo", "Go", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
+  h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest });
+  h += `</div>`;
+  if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy"> Use Bivy Sack if you camp (no Event)</label>`;
+  if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}">${esc(d.name)}</button>`).join("")}</div>`;
+  h += `<div class="small" style="margin-top:8px">3 · After Go or Camp, draw one Event.</div>`;
+  return h;
 }
 
 function fitHand() {
@@ -2290,18 +2647,23 @@ function renderModal() {
   switch (r.type) {
     case "event":
       return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3>
-        <div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>${r.ignored ? `<p class="small" style="color:var(--good)">${esc(r.ignored)}</p>` : ""}
-        ${g.finalLeg(p.pos) && !g.rules.noHarsh && /[Rr]emove/.test(LT.EVENT_TEXT[r.card]) && !r.ignored ? `<p class="small" style="color:var(--bad)">Harsh weather: this drops 2 dogs on the final leg.</p>` : ""}
+        <div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>${r.ignored ? `<p class="small" style="color:var(--good)">${esc(r.ignored)}</p>` : ""}
+        ${g.finalLeg(p.pos) && !g.rules.noHarsh && /[Rr]emove/.test(evText(r.card)) && !r.ignored ? `<p class="small" style="color:var(--bad)">Harsh weather: this drops 2 dogs on the final leg.</p>` : ""}
         <div class="btns"><button class="primary" data-act="ok">OK</button></div>`);
     case "pickEvent":
       return modal(`<div class="label">${esc(p.name)} · ${p.musher === "Gambler" ? "Gambler" : "Cocoa"} · Event from ${esc(r.source)}</div><h3>Choose one Event</h3>
         <div class="cards">${r.options.map((e, i) => eventCard(e, { pick: true, attrs: `data-act="pick" data-v="${i}"` })).join("")}</div>`);
     case "rookieIgnore":
-      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>
+      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>
         <p class="small">Rookie: once per leg you may ignore an Event.</p>
         <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
+    case "gContinue":
+      return modal(`<div class="label">${esc(p.name)} · Go</div><h3>Keep going?</h3>
+        <p>Your team's Speed is now <b>${r.speed}</b>. ${esc(r.label)} has Difficulty <b>${r.cost}</b>.</p>
+        <p class="small">If you keep going, your Lead tires again.</p>
+        <div class="btns"><button data-act="pick" data-v="0">Stop here</button><button class="primary" data-act="pick" data-v="1">Keep going</button></div>`);
     case "alpineIgnore":
-      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(LT.EVENT_TEXT[r.card])}</p>
+      return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>
         <p class="small">Alpine ran this turn: you may ignore one Event you draw this turn.</p>
         <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
     case "removeDog": case "exhaustDog": {
@@ -2390,6 +2752,19 @@ function zoomHTML(spec) {
 
 function rulesHTML() {
   const g = S.game;
+  if ((g ? g.format : S.format) === "gangline") return `<h3>Long Trail · Gangline (prototype)</h3>
+  <details class="rules" open><summary>Your turn</summary><ul>
+    <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
+    <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
+    <li><b>2. Go:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Your Lead dog (the front dog) tires: rested → tired → exhausted. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. Take the reward where you stop.</li>
+    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand.</li>
+    <li><b>3. Event:</b> draw one Event after you Go or Camp (not after a checkpoint camp).</li></ul></details>
+  <details class="rules"><summary>Speed</summary><ul>
+    <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed and role bonus. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
+    <li>Lead bonus +1 if a Lead dog is at the front, Wheel bonus +1 if a Wheel dog is at the back, with at least 2 dogs that aren't exhausted. Drafting: a trail's Difficulty is 1 less if another musher is on or past it.</li></ul></details>
+  <details class="rules"><summary>Checkpoints</summary><ul>
+    <li>Same as Classic: camp once per checkpoint, Long Rest once per race (required before passing Checkpoint 2). Camping at a checkpoint rests every dog.</li></ul></details>
+  <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
   const mode = g ? g.mode : S.mode, rules = g ? g.rules : S.rules, legs = g ? g.legs : S.legs;
   const gen = mode === "generous";
   const fl = [];
@@ -2486,7 +2861,7 @@ function buildMobileBar() {
     html = `<div class="mbsum"><span>Need <b>${need ? need.textContent : "–"}</b></span><span>Have <b class="${have ? have.className.replace("big", "") : ""}">${have ? have.textContent : "–"}</b></span><span class="mbv">${verdict ? verdict.innerHTML : ""}</span></div>
       <button data-act="cancelrun">Back</button><button class="primary" data-act="go" ${go && !go.disabled ? "" : "disabled"}>Run!</button>`;
   } else {
-    const btns = [...document.querySelectorAll("#runpanel .acts > button.act")].filter(b => ["run", "slog", "camp", "cpcamp", "longrest"].includes(b.dataset.act));
+    const btns = [...document.querySelectorAll("#runpanel .acts > button.act")].filter(b => ["run", "slog", "camp", "cpcamp", "longrest", "ggo", "gcamp"].includes(b.dataset.act));
     html = btns.map(b => `<button class="${b.classList.contains("primary") ? "primary" : ""}" data-act="${b.dataset.act}" ${b.disabled ? "disabled" : ""}>${b.querySelector("b").textContent}</button>`).join("");
   }
   bar.innerHTML = html;
@@ -2504,6 +2879,7 @@ document.addEventListener("change", async e => {
   const t = e.target;
   if (t.dataset && t.dataset.leg != null) { S.legs[+t.dataset.leg] = +t.value; store.set("legs", S.legs); renderSetup(); return; }
   if (t.name === "mode") { S.mode = t.value; store.set("mode", S.mode); }
+  if (t.name === "format") { S.format = t.value; store.set("format", S.format); }
   if (t.id === "rule-line") { S.rules.lineMax = +t.value || 0; if (!S.rules.lineMax) delete S.rules.lineMax; store.set("rules", S.rules); }
   if (t.id === "rule-storm") { if (t.checked) delete S.rules.noStorm; else S.rules.noStorm = true; store.set("rules", S.rules); }
   if (t.id === "rule-harsh") { if (t.checked) delete S.rules.noHarsh; else S.rules.noHarsh = true; store.set("rules", S.rules); }
@@ -2586,8 +2962,14 @@ document.addEventListener("click", e => {
     case "go": if (S.run && pd) resolvePending({ type: "run", line: S.run.line.map(x => ({ id: x })), gear: [...S.run.gear] }); break;
     case "slog": if (pd) { const c = $("#uselantern"); resolvePending({ type: "slog", lantern: c ? c.checked : false }); } break;
     case "camp": if (pd) { const c = $("#usebivy"); resolvePending({ type: "camp", bivy: c ? c.checked : false }); } break;
-    case "cpcamp": if (pd) resolvePending({ type: "cp", long: false }); break;
-    case "longrest": if (pd) resolvePending({ type: "cp", long: true }); break;
+    case "cpcamp": if (pd) { S.g = null; resolvePending({ type: "cp", long: false }); } break;
+    case "gsel": { const st = gState(); st.sel = st.sel === id ? null : id; renderGame(); break; }
+    case "ghitch": if (pd) { const st = gState(); const sel = st.sel; st.sel = null; if (sel) resolvePending({ type: "hitch", id: sel, end: b.dataset.v }); } break;
+    case "ggear": { const st = gState(); if (st.gear.has(id)) st.gear.delete(id); else st.gear.add(id); renderGame(); break; }
+    case "gret": { const st = gState(); if (st.ret.has(id)) st.ret.delete(id); else st.ret.add(id); renderGame(); break; }
+    case "ggo": if (pd) { const st = gState(); S.g = null; resolvePending({ type: "go", gear: [...st.gear] }); } break;
+    case "gcamp": if (pd) { const st = gState(); const c = $("#usebivy"); S.g = null; resolvePending({ type: "camp", ret: [...st.ret], bivy: c ? c.checked : false }); } break;
+    case "longrest": if (pd) { S.g = null; resolvePending({ type: "cp", long: true }); } break;
     case "usegear": if (pd) {
       if (S.overlay && S.overlay.type === "zoom") S.overlay = null;
       if (S.run) S.keepRun = { line: S.run.line.slice(), gear: new Set(S.run.gear) };
@@ -2605,7 +2987,7 @@ document.addEventListener("click", e => {
     case "pick": if (pd) {
       const v = b.dataset.v, t = pd.req.type;
       if (t === "pickEvent") resolvePending(+v);
-      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP") resolvePending(v === "1");
+      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP" || t === "alpineIgnore" || t === "gContinue") resolvePending(v === "1");
       else resolvePending(v);
     } break;
     case "keeptoggle": if (pd) {
@@ -2645,7 +3027,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 7:09 PM";
+const LT_BUILD = "Oct 15, 10:48 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
