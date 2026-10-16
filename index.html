@@ -451,9 +451,9 @@ const LT = (() => {
     ["Tangled Lines", 2, "Move your Lead dog to the back of your line."],
     ["Bitter Cold", 4, "Drop an exhausted dog. If you have none, one tired dog becomes exhausted."],
     ["Blizzard", 2, "Drop an exhausted dog. Then move back one trail, but never past a checkpoint."],
-    ["Whiteout", 1, "You can't Go on your next turn."],
+    ["Whiteout", 1, "You can't Run on your next turn."],
     ["Second Wind", 2, "One tired dog in your line becomes rested."],
-    ["Tailwind", 2, "Keep this card. Your next Go gets +2 Speed, then discard it."],
+    ["Tailwind", 2, "Keep this card. Your next Run gets +2 Speed, then discard it."],
     ["Clear Skies", 2, "No effect."],
   ];
   const EVENT_TEXT = Object.fromEntries(EVENTS.map(e => [e[0], e[2]]));
@@ -467,7 +467,7 @@ const LT = (() => {
       "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
     },
     gear: {
-      "Booties": "The first step of this Go doesn't tire a dog.",
+      "Booties": "The first step of this Run doesn't tire a dog.",
       "Dog Food": "One exhausted dog becomes rested.",
       "Whistle": "One tired dog becomes rested.",
       "Hot Broth": "All your tired dogs become rested.",
@@ -938,7 +938,7 @@ const LT = (() => {
       if (kind === "dog") { card.state = "rested"; p.dogs.push(card); }
       else p.gear.push(card);
       this.log(`${p.name} takes the trail reward: ${card.name}.`, "good");
-      if (p.musher === "Trapper") await this.drawDogs(p, 1, 1, "Trapper");
+      if (p.musher === "Trapper" && !(this.rules.gTrapNoReward && !p.after)) await this.drawDogs(p, 1, 1, "Trapper");
       if (line.some(x => x.st === "rested" && x.dog.ab === "scavenger")) this.takeGear(p, "Ranger");
       if (p.musher === "Trailbreaker" && p.after) this.takeGear(p, "Trailbreaker");
     }
@@ -1189,7 +1189,7 @@ const LT = (() => {
       p.camped.add(cp);
       p.campedLast = true;
       this.refreshDogs(p);
-      const trapExtra = p.musher === "Trapper" && !p.after ? 3 : 0;
+      const trapExtra = p.musher === "Trapper" && !p.after ? (this.rules.gTrapExtra != null ? this.rules.gTrapExtra : 3) : 0;
       const [dd, dk, gd] = this.cpGains(cp, long);
       const src = long ? "Long Rest" : "Checkpoint camp";
       if (long) {
@@ -1300,15 +1300,16 @@ const LT = (() => {
         if (n.c.type === "CP") { this.log(`${p.name} reaches Checkpoint ${n.c.cp}.`, "act"); await this.vetCheck(p, n.nxt); }
         if (n.c.type === "T" && n.c.name === "River Ice" && p.line.filter(d => d.state !== "exh").length >= 3 && !this.shadowSafe(p)) runEvents.push("River Ice");
         const tiredNow = this.rules.gTire2 ? p.line.find(d => d.state !== "exh") : null;
-        if (!(booties && moved === 1)) await this.gTireLead(p, "breaking trail");
-        if (this.rules.gTire2 && !(booties && moved === 1)) { const d2 = p.line.filter(d => d.state !== "exh" && d !== tiredNow)[0]; if (d2) await this.gTireDog(p, d2, "breaking trail"); }
+        const vetB = this.rules.gVetB && p.musher === "Veteran" && !p.after && moved === 1;
+        if (!(booties && moved === 1) && !vetB) await this.gTireLead(p, "breaking trail");
+        if (this.rules.gTire2 && !(booties && moved === 1) && !vetB) { const d2 = p.line.filter(d => d.state !== "exh" && d !== tiredNow)[0]; if (d2) await this.gTireDog(p, d2, "breaking trail"); }
         this.upd();
         // Pressing on: every step after the first draws an Event right away (not onto a checkpoint).
-        if (moved > 1 && n.c.type === "T" && !this.rules.gNoStepEv) {
+        if (moved > 1 && n.c.type === "T" && !this.rules.gNoStepEv && !(this.rules.gVetA && p.musher === "Veteran" && !p.after)) {
           const here = p.pos;
           await this.event(p, "pressing on");
           if (p.scratched || this.over) break;
-          if (p.pos !== here) { this.log(`${p.name}'s Go ends.`, "bad"); break; }
+          if (p.pos !== here) { this.log(`${p.name}'s Run ends.`, "bad"); break; }
         }
       }
       if (moved) this.log(`${p.name} moves from ${this.label(start)} to ${this.label(p.pos)}.`, "act");
@@ -1340,7 +1341,7 @@ const LT = (() => {
       p.campedLast = true;
       const here = p.pos >= 0 ? this.path[p.pos] : null;
       this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
-      if (p.musher === "Trapper" && p.after) await this.drawDogs(p, 1, 1, "Trapper");
+      if (p.musher === "Trapper" && p.after && !this.rules.gTrapNoCamp) await this.drawDogs(p, 1, 1, "Trapper");
       for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
       let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
       if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
@@ -1389,7 +1390,7 @@ const LT = (() => {
         case "Tangled Lines": if (line.length > 1) { const f = line.shift(); line.push(f); this.log(`${f.name} ends up at the back of the line.`, "bad"); } break;
         case "Bitter Cold": if (!(await dropExh(this.rules.gColdTired))) { const d = await pickLine(d => d.state === "tired", "No exhausted dogs: choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } } break;
         case "Blizzard": await dropExh(this.rules.gBlizTired); if (!p.scratched) this.moveBack(p); break;
-        case "Whiteout": p.noGo = true; this.log(`${p.name} can't Go next turn.`, "bad"); break;
+        case "Whiteout": p.noGo = true; this.log(`${p.name} can't Run next turn.`, "bad"); break;
         case "Second Wind": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to rest."); if (d) { d.state = "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
         case "Tailwind": p.runBonus += 2; p.keptEvents.push(e); break;
         default: break;
@@ -2173,7 +2174,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 6:39 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 6:53 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2196,7 +2197,7 @@ function renderSetup() {
       <div class="label">Game format</div>
       <div class="modes">
         <label><input type="radio" name="format" value="classic" ${S.format !== "gangline" ? "checked" : ""}> <span><b>Classic</b><small>Build a team from your hand each turn and run it as far as its Speed takes you.</small></span></label>
-        <label><input type="radio" name="format" value="gangline" ${S.format === "gangline" ? "checked" : ""}> <span><b>Gangline (prototype)</b><small>Your team stays on the table. Each turn: hitch one dog at the front or back, then Go (one trail at a time, your Lead tires each step, keep going while your Speed covers the next trail) or Camp (every dog recovers one step). Then draw one Event.</small></span></label>
+        <label><input type="radio" name="format" value="gangline" ${S.format === "gangline" ? "checked" : ""}> <span><b>Gangline (prototype)</b><small>Your team stays on the table. Each turn: hitch one dog at the front or back, then Run (one trail at a time; your front 2 dogs tire each step and every trail after the first draws an Event; keep going while your Speed covers the next trail) or Camp (every dog recovers one step). Then draw one Event.</small></span></label>
       </div>
       <div class="label" style="margin-top:14px">Trail layout</div>
       <div class="legs">
@@ -2257,7 +2258,7 @@ function playerChips(p) {
     chips.push(`<span class="chip">${p.gear.length} gear${p.used.length ? ` · ${p.used.length} used` : ""}</span>`);
     if (p.longRested) chips.push(`<span class="chip ok">Long Rest done</span>`);
     if (p.skip) chips.push(`<span class="chip warn">skips next turn</span>`);
-    if (p.noGo) chips.push(`<span class="chip warn">can't Go next turn</span>`);
+    if (p.noGo) chips.push(`<span class="chip warn">can't Run next turn</span>`);
     if (p.keptEvents.length) chips.push(`<span class="chip">${p.keptEvents.map(esc).join(", ")}</span>`);
     if (p.lost.length) chips.push(`<span class="chip warn">dropped ${p.lost.length}</span>`);
     if (p.scratched) chips.push(`<span class="chip warn">scratched</span>`);
@@ -2433,7 +2434,7 @@ function renderGBoard(p, myTurn) {
   const lineHTML = p.line.map((d, i) => `<div class="gslot">${dogCard(d, { flag: stName(d) })}<div class="gpos">${i === 0 ? "Front · Lead" : i === p.line.length - 1 ? "Back · Wheel" : "#" + (i + 1)}</div></div>`).join("");
   const tz = [];
   if (p.used.length) tz.push(`<div class="tz"><div class="label">Used gear · back at your Long Rest</div><div class="row">${p.used.map(gr => gearCard(gr, { used: true })).join("")}</div></div>`);
-  if (p.keptEvents.length) tz.push(`<div class="tz"><div class="label">Kept Events · next Go</div><div class="row">${p.keptEvents.map(e => eventCard(e)).join("")}</div></div>`);
+  if (p.keptEvents.length) tz.push(`<div class="tz"><div class="label">Kept Events · next Run</div><div class="row">${p.keptEvents.map(e => eventCard(e)).join("")}</div></div>`);
   const items = [];
   hand.forEach(d => items.push(`<div class="hc">${dogCard(d, { pick: !!canHitch, sel: st.sel === d.id, attrs: canHitch ? `data-act="gsel" data-id="${d.id}"` : "", state: "rested" })}</div>`));
   p.gear.forEach((gr, j) => {
@@ -2480,26 +2481,26 @@ function gActionsHTML(p, st) {
     h += st.sel ? `<div class="row2"><button data-act="ghitch" data-v="front">At the front</button><button data-act="ghitch" data-v="back">At the back</button><button class="ghost" data-act="gsel" data-id="${st.sel}">Cancel</button></div>`
       : `<div class="small">Tap a dog in your hand, then choose front or back.</div>`;
   } else h += `<div class="small" style="margin-top:8px">${p.hitchN ? "You've hitched this turn." : hand.length ? "Your line is full." : "No dogs in hand to hitch."}</div>`;
-  h += `<div class="label" style="margin-top:10px">2 · Go or Camp</div><div class="acts">`;
+  h += `<div class="label" style="margin-top:10px">2 · Run or Camp</div><div class="acts">`;
   const noLine = !p.line.length && hand.length;
   if (L.atOpenCP) {
     h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, "Every dog rests. Take the top dog and gear. No Event.", { disabled: L.mustLongRest || noLine });
     h += btn("longrest", "Long Rest", "Every dog rests, used gear returns, take the top dog and gear, then skip a turn. No Event.", { primary: L.mustLongRest, disabled: noLine });
   }
   let goSub;
-  if (noGo) goSub = "Whiteout: you can't Go this turn.";
+  if (noGo) goSub = "Whiteout: you can't Run this turn.";
   else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
   else if (n.blocked) goSub = "Tank won't step onto River Ice. Camp and send Tank back to your hand first.";
   else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
   else goSub = `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire. Every trail after the first draws an Event.`;
-  h += btn("ggo", "Go", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
+  h += btn("ggo", "Run", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
   const mustHitch = !p.line.length && hand.length;
   if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
   if (!L.atOpenCP) h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest || mustHitch });
   h += `</div>`;
   if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy" data-act="gbivy" ${st.bivy ? "checked" : ""}> Use Bivy Sack if you camp (no Event)</label>`;
   if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}" ${!st.ret.has(d.id) && st.ret.size >= p.line.length - 1 ? "disabled" : ""}>${esc(d.name)}</button>`).join("")}</div><div class="small">At least one dog stays hitched. An empty gangline is scratched.</div>`;
-  h += `<div class="small" style="margin-top:8px">3 · After Go or Camp, draw one Event (none before Checkpoint 1 or if you end at a checkpoint).</div>`;
+  h += `<div class="small" style="margin-top:8px">3 · After you Run or Camp, draw one Event (none before Checkpoint 1 or if you end at a checkpoint).</div>`;
   return h;
 }
 
@@ -2780,7 +2781,7 @@ function renderModal() {
         <p class="small">Rookie: once per leg you may ignore an Event.</p>
         <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
     case "gContinue":
-      return modal(`<div class="label">${esc(p.name)} · Go</div><h3>Keep going?</h3>
+      return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Keep going?</h3>
         <p>Your team's Speed is now <b>${r.speed}</b>. ${esc(r.label)} has Difficulty <b>${r.cost}</b>.</p>
         <p class="small">If you keep going, your first 2 dogs that aren't exhausted tire${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
         ${g.gStepSpends(p) && g.path[r.next] && g.path[r.next].type === "T" ? `<p class="small" style="color:var(--bad)"><b>Danger:</b> this step exhausts your whole team. End your turn on a trail like that and you're scratched.</p>` : ""}
@@ -2882,9 +2883,9 @@ function rulesHTML() {
     <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
-    <li><b>2. Go:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Go draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Go ends. Take the reward where you stop.</li>
+    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand.</li>
-    <li><b>3. Event:</b> draw one Event after you Go or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.</li>
+    <li><b>3. Event:</b> draw one Event after you Run or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.</li>
     <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
     <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed and role bonus. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
@@ -3157,7 +3158,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 6:39 AM";
+const LT_BUILD = "Oct 16, 6:53 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
