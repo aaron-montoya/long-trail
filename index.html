@@ -478,12 +478,13 @@ const LT = (() => {
     gear: {
       "Booties": "Play as you move onto a trail: your dogs don't tire for that trail.",
       "Dog Food": "One dog in your gangline recovers one step.",
-      "Bivy Sack": "Play at the end of your turn: draw no end-of-turn Event.",
+      "Bivy Sack": "Draw no end-of-turn Event.",
       "Whistle": "One tired dog becomes rested.",
       "Hot Broth": "All your tired dogs become rested.",
     },
     musher: {
-      "Veteran": ["No ability in Gangline (there's no Slog).", "Final-leg trails have 1 less Difficulty for you."],
+      "Veteran": ["Pressing on never makes you draw an Event.", "Final-leg trails have 1 less Difficulty for you."],
+      "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 2 extra and choose which to keep.", "When you take a trail reward, also take the top card of the Dog deck."],
     },
     noGear: ["Red Lantern"], // nothing to do without Slog
   };
@@ -537,6 +538,9 @@ const LT = (() => {
         // a spent team on a trail is scratched (checkpoints are safe)
         if (this.rules.gScratchExh === undefined) { this.rules.gScratchExh = "line"; this.rules.gScratchNoCP = true; }
         if (this.rules.gTankAuto === undefined) this.rules.gTankAuto = true; // Tank steps off the line before River Ice
+        // Gangline musher text: Veteran ignores pressing-on Events; Trapper draws 2 extra at checkpoints (Before) and a dog with rewards (After)
+        const def = { gVetA: true, gTrapExtra: 2, gTrapNoReward: true, gTrapNoCamp: true };
+        for (const k in def) if (this.rules[k] === undefined) this.rules[k] = def[k];
         if (this.rules.gBrambleRested === undefined) this.rules.gBrambleRested = true; // after running rested, Bramble is tired
         if (this.rules.gBrambleTired === undefined) this.rules.gBrambleTired = true;
       }
@@ -2253,7 +2257,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 8:12 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 8:17 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3256,7 +3260,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 8:12 AM";
+const LT_BUILD = "Oct 16, 8:17 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
