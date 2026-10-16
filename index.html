@@ -468,6 +468,7 @@ const LT = (() => {
       "Desdemona": ["+2 if another musher is ahead of you.", "", 3, 2],
       "Tank": ["As your team moves onto River Ice, put Tank in your hand.", "As your team moves onto River Ice, put Tank in your hand."],
       "Bramble": ["After running rested, Bramble is tired.", "", 5, 2],
+      "Flash": ["", "If an Event drops a dog while Flash is tired, drop Flash."],
       "Cocoa": ["While Cocoa is on your gangline, camping in the open also returns one used gear.", "While Cocoa is on your gangline, camping in the open also returns one used gear."],
       "Shadow": ["While Shadow is on your gangline, River Ice and Exposed Ridge never make you draw Events.", "While Shadow is on your gangline, River Ice and Exposed Ridge never make you draw Events."],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
@@ -982,8 +983,8 @@ const LT = (() => {
       if (g.name === "Dog Food") {
         const d = p.dogs.find(x => x.id === target && x.state === "exh") || this.exh(p)[0];
         if (!d) return;
-        d.state = "rested";
-        this.log(`${p.name} uses Dog Food: ${d.name} is back in hand.`, "good");
+        d.state = this.rules.gDogFoodTired ? "tired" : "rested";
+        this.log(`${p.name} uses Dog Food: ${d.name} is ${d.state === "tired" ? "tired" : "rested"}.`, "good");
       } else if (g.name === "Whistle") {
         const d = p.dogs.find(x => x.id === target && x.state === "tired") || this.tired(p)[0];
         if (!d) return;
@@ -1407,7 +1408,7 @@ const LT = (() => {
         let pool = line.filter(d => d.state === "exh");
         if (!pool.length && orTired) pool = line.filter(d => d.state === "tired");
         if (!pool.length) return false; // nothing to drop, so Flash is safe too
-        const flash = line.filter(d => d.ab === "fragile" && d.state !== "rested");
+        const flash = line.filter(d => d.ab === "fragile" && d.state === "tired"); // Gangline: only while tired
         if (flash.length) pool = flash;
         const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: flash.length ? "Flash is tired or exhausted, so Flash must go." : "Choose an exhausted dog." });
         await this.dropDog(p, pool.find(d => d.id === id) || pool[0], e);
@@ -2226,7 +2227,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 7:52 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 7:55 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3222,7 +3223,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 7:52 AM";
+const LT_BUILD = "Oct 16, 7:55 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
