@@ -465,7 +465,7 @@ const LT = (() => {
       // [rested text, tired text, rested Speed, tired Speed]
       "Desdemona": ["+2 if another musher is ahead of you.", "", 3, 2],
       "Tank": ["Tank won't go on River Ice. Before your team moves onto River Ice, put Tank in your hand.", "Tank won't go on River Ice. Before your team moves onto River Ice, put Tank in your hand."],
-      "Bramble": ["After running rested, Bramble is exhausted.", ""],
+      "Bramble": ["After running rested, Bramble is tired.", "", 5, 2],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
       "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
       "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
@@ -531,7 +531,8 @@ const LT = (() => {
         // a spent team on a trail is scratched (checkpoints are safe)
         if (this.rules.gScratchExh === undefined) { this.rules.gScratchExh = "line"; this.rules.gScratchNoCP = true; }
         if (this.rules.gTankAuto === undefined) this.rules.gTankAuto = true; // Tank steps off the line before River Ice
-        if (this.rules.gBrambleRested === undefined) this.rules.gBrambleRested = true; // after running rested, Bramble is exhausted
+        if (this.rules.gBrambleRested === undefined) this.rules.gBrambleRested = true; // after running rested, Bramble is tired
+        if (this.rules.gBrambleTired === undefined) this.rules.gBrambleTired = true;
       }
       this.r = rng(this.seed);
       this.round = 0;
@@ -1358,6 +1359,17 @@ const LT = (() => {
       if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
       for (const d of back) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; }
       if (back.length) this.log(`${p.name} brings ${back.map(d => d.name).join(", ")} back to hand.`, "");
+      // When you camp, you may rearrange your line (bots use their usual best order)
+      if (p.bot && !action.order && !this.rules.gNoRearrange && p.line.length > 1) {
+        const ord = Bot.arrange(p.line.map(d => ({ dog: d, st: d.state }))).map(x => x.dog);
+        if (ord.length === p.line.length) action = { ...action, order: ord.map(d => d.id) };
+      }
+      if (action.order && action.order.length && !this.rules.gNoRearrange) {
+        const ord = action.order.map(id => p.line.find(d => d.id === id)).filter(Boolean);
+        const rest = p.line.filter(d => !ord.includes(d));
+        const next = [...ord, ...rest];
+        if (next.some((d, i) => d !== p.line[i])) { p.line = next; this.log(`${p.name} rearranges the gangline.`, ""); }
+      }
       const cocoa = this.gHand(p).some(d => d.ab === "cocoa");
       if (cocoa && p.used.length) {
         const id = await this.ask(p, { type: "tinker", options: p.used.map(g => g.id), source: "Cocoa" });
@@ -2191,7 +2203,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 7:20 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 7:31 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2441,6 +2453,13 @@ function renderBoard() {
 
 
 // ---------------- Gangline mode board ----------------
+// The order the player has set for camping (ids), kept in sync with the dogs actually in the line
+function gOrder(p, st) {
+  const ids = (st.order || []).filter(id => p.line.some(d => d.id === id));
+  for (const d of p.line) if (!ids.includes(d.id)) ids.push(d.id);
+  st.order = ids;
+  return ids.map(id => p.line.find(d => d.id === id));
+}
 function gState() { return S.g || (S.g = { sel: null, gear: new Set(), ret: new Set(), bivy: true }); }
 function renderGBoard(p, myTurn) {
   const g = S.game, el = $("#board"), rp = $("#runpanel");
@@ -2517,6 +2536,10 @@ function gActionsHTML(p, st) {
   h += `</div>`;
   if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy" data-act="gbivy" ${st.bivy ? "checked" : ""}> Use Bivy Sack if you camp (no Event)</label>`;
   if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}" ${!st.ret.has(d.id) && st.ret.size >= p.line.length - 1 ? "disabled" : ""}>${esc(d.name)}</button>`).join("")}</div><div class="small">At least one dog stays hitched. An empty gangline is scratched.</div>`;
+  if (p.line.length > 1) {
+    const ord = gOrder(p, st);
+    h += `<div class="small" style="margin-top:8px">If you camp, also rearrange your line (front → back):</div><div class="row2">${ord.map((d, i) => `<span class="chipbtn" style="display:inline-flex;gap:4px;align-items:center"><button class="ghost" data-act="gmove" data-id="${d.id}" data-v="-1" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(d.name)} forward">◀</button>${esc(d.name)}<button class="ghost" data-act="gmove" data-id="${d.id}" data-v="1" ${i === ord.length - 1 ? "disabled" : ""} aria-label="Move ${esc(d.name)} back">▶</button></span>`).join("")}</div>`;
+  }
   h += `<div class="small" style="margin-top:8px">3 · After you Run or Camp, draw one Event (none before Checkpoint 1 or if you end at a checkpoint).</div>`;
   return h;
 }
@@ -2901,7 +2924,7 @@ function rulesHTML() {
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
     <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
-    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand.</li>
+    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line.</li>
     <li><b>3. Event:</b> draw one Event after you Run or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.</li>
     <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
@@ -3112,11 +3135,12 @@ document.addEventListener("click", e => {
     case "gsel": { const st = gState(); st.sel = st.sel === id ? null : id; renderGame(); break; }
     case "ghitch": if (pd) { const st = gState(); const sel = st.sel; st.sel = null; if (sel) resolvePending({ type: "hitch", id: sel, end: b.dataset.v }); } break;
     case "ggear": { const st = gState(); if (st.gear.has(id)) st.gear.delete(id); else st.gear.add(id); renderGame(); break; }
+    case "gmove": { const st = gState(); const p = pd && pd.p; if (!p) break; const ord = gOrder(p, st).map(d => d.id); const i = ord.indexOf(id), j = i + (+b.dataset.v); if (i >= 0 && j >= 0 && j < ord.length) { [ord[i], ord[j]] = [ord[j], ord[i]]; st.order = ord; } renderGame(); break; }
     case "gbivycard": { const st = gState(); st.bivy = !st.bivy; renderGame(); break; }
     case "gbivy": { const st = gState(); st.bivy = !!b.checked; break; }
     case "gret": { const st = gState(); if (st.ret.has(id)) st.ret.delete(id); else st.ret.add(id); renderGame(); break; }
     case "ggo": if (pd) { const st = gState(); S.g = null; resolvePending({ type: "go", gear: [...st.gear] }); } break;
-    case "gcamp": if (pd) { const st = gState(); const c = $("#usebivy"); S.g = null; resolvePending({ type: "camp", ret: [...st.ret], bivy: c ? c.checked : false }); } break;
+    case "gcamp": if (pd) { const st = gState(); const c = $("#usebivy"); S.g = null; resolvePending({ type: "camp", ret: [...st.ret], bivy: c ? c.checked : false, order: st.order || [] }); } break;
     case "longrest": if (pd) { S.g = null; resolvePending({ type: "cp", long: true }); } break;
     case "usegear": if (pd) {
       if (S.overlay && S.overlay.type === "zoom") S.overlay = null;
@@ -3175,7 +3199,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 7:20 AM";
+const LT_BUILD = "Oct 16, 7:31 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
