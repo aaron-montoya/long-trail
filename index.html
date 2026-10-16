@@ -543,6 +543,7 @@ const LT = (() => {
         for (const k in def) if (this.rules[k] === undefined) this.rules[k] = def[k];
         if (this.rules.gBrambleRested === undefined) this.rules.gBrambleRested = true; // after running rested, Bramble is tired
         if (this.rules.gBrambleTired === undefined) this.rules.gBrambleTired = true;
+        if (this.rules.finishCost === undefined) this.rules.finishCost = 5; // Gangline Finish is Difficulty 5
       }
       this.r = rng(this.seed);
       this.round = 0;
@@ -563,7 +564,7 @@ const LT = (() => {
         for (let i = 0; i < n; i++) this.path.push(trails[k++]);
         if (li < 2) this.path.push({ id: nid("c"), type: "CP", cp: li + 1 });
       });
-      this.path.push({ id: nid("f"), type: "F", cost: FINISH_COST });
+      this.path.push({ id: nid("f"), type: "F", cost: this.rules.finishCost || FINISH_COST });
       // Gangline: Trail 1 is always the Starting Chute, Difficulty 2.
       if (this.format === "gangline") this.path[0] = { id: nid("t"), type: "T", name: G_START.name, cost: G_START.cost, rtype: null, up: false, reward: null, start: true };
       this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
@@ -717,7 +718,7 @@ const LT = (() => {
     }
     trailCost(p, i, line, gearSel = [], known = true) {
       const c = this.path[i];
-      if (c.type === "F") return FINISH_COST;
+      if (c.type === "F") return this.rules.finishCost || FINISH_COST;
       if (c.type === "CP") return this.cpCost();
       if (!c.up && !known) return null;
       let cost = c.cost;
@@ -1988,6 +1989,7 @@ function gearCard(g, o = {}) {
   return o.used ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
 }
 const isG = () => S.game ? S.game.format === "gangline" : S.format === "gangline";
+const finCost = () => S.game ? (S.game.rules.finishCost || LT.FINISH_COST) : (isG() ? 5 : LT.FINISH_COST);
 const gAlt = (kind, name) => isG() ? LT.G_ALT[kind][name] : null;
 const G_CP_TEXT = "Camp here once: every dog rests, take the top dog and the top gear. Long Rest: the same, plus all used gear returns, then skip a turn. Checkpoints never make you draw an Event.";
 const musherT = m => gAlt("musher", m) || LT.MUSHERS[m];
@@ -2018,8 +2020,8 @@ function trailCard(c, i, o = {}) {
     return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Difficulty 1</div><div class="cx">${esc(isG() ? G_CP_TEXT : LT.CP_TEXT)}</div>`}</div>`;
   }
   if (c.type === "F") {
-    const url = artFor(artKeys.finish());
-    return `<div class="card finish" data-zoom="finish" title="Finish">${url ? img(url) : `<div class="band"></div><div class="ct">Finish</div><div class="cs">Difficulty ${LT.FINISH_COST}</div><div class="cx">${esc(LT.FINISH_TEXT)}</div>`}</div>`;
+    const url = finCost() === LT.FINISH_COST ? artFor(artKeys.finish()) : null; // printed card says Difficulty 2
+    return `<div class="card finish" data-zoom="finish" title="Finish">${url ? img(url) : `<div class="band"></div><div class="ct">Finish</div><div class="cs">Difficulty ${finCost()}</div><div class="cx">${esc(LT.FINISH_TEXT)}</div>`}</div>`;
   }
   if (!c.up && !o.reveal) return backCard("trail").replace('class="card back', 'data-zoom="back" class="card back');
   const url = artFor(artKeys.trail(c));
@@ -2270,7 +2272,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 8:39 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 9:17 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2697,7 +2699,7 @@ function targetInfo(g, p, line, gear) {
   if (g.path[i].type === "CP") i++;
   const c = g.path[i];
   const cost = g.trailCost(p, i, line, gear);
-  const printed = c.type === "F" ? LT.FINISH_COST : c.cost;
+  const printed = c.type === "F" ? finCost() : c.cost;
   const reasons = costWhy(g, p, i, line, gear);
   if (cost === 1 && printed > 1 && reasons.length) reasons.push("can't go below 1");
   const sp = g.speedOf(p, line, gear);
@@ -2769,7 +2771,7 @@ function runPanelHTML(p) {
     const later = pv.steps.filter(st => g.path[st.pos].type !== "CP").slice(1).map(st => {
       const c = g.path[st.pos];
       const label = c.type === "F" ? "Finish" : `${esc(c.name)}`;
-      const printed = c.type === "F" ? LT.FINISH_COST : c.cost;
+      const printed = c.type === "F" ? finCost() : c.cost;
       const w = costWhy(g, p, st.pos, pr.line, pr.gear);
       return `<span class="tchip" title="${esc(w.join(", "))}">then ${label} ${st.cost}${st.cost !== printed ? ` <s>${printed}</s>` : ""}</span>`;
     }).join("");
@@ -2992,7 +2994,7 @@ function zoomHTML(spec) {
       <p class="small">${c ? (c === "dog" ? "Dog reward: end your Run here to take the dog." : "Gear reward: end your Run here to take the gear.") : "No reward."} Drafting: Difficulty is 1 less if another musher is on or past it${a === "Deep Powder" ? " (3 less here)" : ""}.</p></div></div>`;
   }
   if (kind === "cp") return `<div class="zoomview">${trailCard({ type: "CP", cp: +a }, 0)}<div class="zt"><div class="label">Checkpoint ${a} · Difficulty 1</div><h3>Checkpoint</h3><p>${esc(isG() ? G_CP_TEXT : LT.CP_TEXT)}</p><p class="small">Every musher takes exactly one Long Rest, at either checkpoint, and must take it before passing Checkpoint 2.</p></div></div>`;
-  if (kind === "finish") return `<div class="zoomview">${trailCard({ type: "F" }, 0)}<div class="zt"><div class="label">Difficulty ${LT.FINISH_COST}</div><h3>Finish</h3><p>${esc(LT.FINISH_TEXT)}</p></div></div>`;
+  if (kind === "finish") return `<div class="zoomview">${trailCard({ type: "F" }, 0)}<div class="zt"><div class="label">Difficulty ${finCost()}</div><h3>Finish</h3><p>${esc(LT.FINISH_TEXT)}</p></div></div>`;
   if (kind === "back") return `<div class="zoomview">${backCard("trail")}<div class="zt"><h3>Face-down trail</h3><p>Flips when a musher moves onto the trail before it.</p></div></div>`;
   return "";
 }
@@ -3001,7 +3003,7 @@ function rulesHTML() {
   const g = S.game;
   if ((g ? g.format : S.format) === "gangline") return `<h3>Long Trail · Gangline (prototype)</h3>
   <details class="rules" open><summary>Your turn</summary><ul>
-    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2.</li>
+    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2. The Finish is Difficulty 5.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line. If your line is empty, you must hitch.</li>
     <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
@@ -3281,7 +3283,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 8:39 AM";
+const LT_BUILD = "Oct 16, 9:17 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
