@@ -1680,6 +1680,9 @@ const LT = (() => {
       }
       const bivy = !!p.gear.find(x => x.name === "Bivy Sack");
       if (noGo) return { type: "camp", bivy };
+      // Tank blocks River Ice: camp and send him back to hand
+      const nb = g.gNext(p, []);
+      if (nb && nb.blocked) { const tank = p.line.find(d => d.ab === "heavy" && d.state !== "exh"); if (tank && p.line.length > 1) return { type: "camp", bivy, ret: [tank.id] }; }
       const worn = (exhN * 2 >= p.line.length && p.line.length > 0) || (g.rules.gLeadDrop && p.line[0] && p.line[0].state === "exh")
         || g.gStepSpends(p);
       const n = g.gNext(p, []);
@@ -2170,7 +2173,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 6:32 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 6:39 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2420,7 +2423,7 @@ function renderBoard() {
 
 
 // ---------------- Gangline mode board ----------------
-function gState() { return S.g || (S.g = { sel: null, gear: new Set(), ret: new Set() }); }
+function gState() { return S.g || (S.g = { sel: null, gear: new Set(), ret: new Set(), bivy: true }); }
 function renderGBoard(p, myTurn) {
   const g = S.game, el = $("#board"), rp = $("#runpanel");
   const st = myTurn ? gState() : { sel: null, gear: new Set(), ret: new Set() };
@@ -2436,7 +2439,8 @@ function renderGBoard(p, myTurn) {
   p.gear.forEach((gr, j) => {
     const runG = myTurn && gr.when === "run";
     const free = myTurn && gr.when === "free" && canUseFree(p, g, gr);
-    items.push(`<div class="hc ${j === 0 && hand.length ? "gap" : ""}">${gearCard(gr, { pick: runG, sel: st.gear.has(gr.id), attrs: runG ? `data-act="ggear" data-id="${gr.id}"` : "" })}${free ? `<button class="usebtn" data-act="usegear" data-id="${gr.id}">Use</button>` : ""}</div>`);
+    const isBivy = myTurn && gr.name === "Bivy Sack";
+    items.push(`<div class="hc ${j === 0 && hand.length ? "gap" : ""}">${gearCard(gr, { pick: runG || isBivy, sel: isBivy ? st.bivy : st.gear.has(gr.id), flag: isBivy && st.bivy ? "for camp" : "", attrs: runG ? `data-act="ggear" data-id="${gr.id}"` : isBivy ? `data-act="gbivycard"` : "" })}${free ? `<button class="usebtn" data-act="usegear" data-id="${gr.id}">Use</button>` : ""}</div>`);
   });
   el.innerHTML = `
     <div class="musherrow">
@@ -2485,7 +2489,7 @@ function gActionsHTML(p, st) {
   let goSub;
   if (noGo) goSub = "Whiteout: you can't Go this turn.";
   else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
-  else if (n.blocked) goSub = "Tank won't step onto River Ice.";
+  else if (n.blocked) goSub = "Tank won't step onto River Ice. Camp and send Tank back to your hand first.";
   else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
   else goSub = `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire. Every trail after the first draws an Event.`;
   h += btn("ggo", "Go", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
@@ -2493,7 +2497,7 @@ function gActionsHTML(p, st) {
   if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
   if (!L.atOpenCP) h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest || mustHitch });
   h += `</div>`;
-  if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy"> Use Bivy Sack if you camp (no Event)</label>`;
+  if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy" data-act="gbivy" ${st.bivy ? "checked" : ""}> Use Bivy Sack if you camp (no Event)</label>`;
   if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}" ${!st.ret.has(d.id) && st.ret.size >= p.line.length - 1 ? "disabled" : ""}>${esc(d.name)}</button>`).join("")}</div><div class="small">At least one dog stays hitched. An empty gangline is scratched.</div>`;
   h += `<div class="small" style="margin-top:8px">3 · After Go or Camp, draw one Event (none before Checkpoint 1 or if you end at a checkpoint).</div>`;
   return h;
@@ -3090,6 +3094,8 @@ document.addEventListener("click", e => {
     case "gsel": { const st = gState(); st.sel = st.sel === id ? null : id; renderGame(); break; }
     case "ghitch": if (pd) { const st = gState(); const sel = st.sel; st.sel = null; if (sel) resolvePending({ type: "hitch", id: sel, end: b.dataset.v }); } break;
     case "ggear": { const st = gState(); if (st.gear.has(id)) st.gear.delete(id); else st.gear.add(id); renderGame(); break; }
+    case "gbivycard": { const st = gState(); st.bivy = !st.bivy; renderGame(); break; }
+    case "gbivy": { const st = gState(); st.bivy = !!b.checked; break; }
     case "gret": { const st = gState(); if (st.ret.has(id)) st.ret.delete(id); else st.ret.add(id); renderGame(); break; }
     case "ggo": if (pd) { const st = gState(); S.g = null; resolvePending({ type: "go", gear: [...st.gear] }); } break;
     case "gcamp": if (pd) { const st = gState(); const c = $("#usebivy"); S.g = null; resolvePending({ type: "camp", ret: [...st.ret], bivy: c ? c.checked : false }); } break;
@@ -3151,7 +3157,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 6:32 AM";
+const LT_BUILD = "Oct 16, 6:39 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
