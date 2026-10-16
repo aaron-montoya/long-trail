@@ -1402,6 +1402,7 @@ const LT = (() => {
       this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
       if (p.musher === "Trapper" && p.after && !this.rules.gTrapNoCamp) await this.drawDogs(p, 1, 1, "Trapper");
       const cocoaOnLine = p.line.some(d => d.ab === "cocoa" && d.state !== "exh"); // Cocoa works from the gangline, rested or tired
+      p.gCampAllRested = p.line.length > 0 && p.line.every(d => d.state === "rested"); // for the stuck-team scratch
       for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
       let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
       if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
@@ -1521,6 +1522,18 @@ const LT = (() => {
     }
     // Optional rule: a team with no dog left that isn't exhausted can't go on.
     async gSpentCheck(p) {
+      // Stuck team: you camped in the open with every dog already rested, have no dogs in hand,
+      // and your Speed still can't cover the next trail. Nothing can change, so you're scratched.
+      const campedRested = p.gCampAllRested; p.gCampAllRested = false;
+      if (campedRested && !this.rules.gNoStuck && !p.scratched && !this.over && p.line.length && !this.gHand(p).length && p.line.every(d => d.state === "rested")) {
+        const nx = this.gNext(p, []);
+        if (nx && !nx.ok) {
+          p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
+          this.log(`${p.name}'s team is fully rested but still can't cover ${this.label(nx.nxt)}. ${p.name} is scratched.`, "bad");
+          this.upd();
+          return;
+        }
+      }
       if (this.rules.gBrambleExh) for (const d of p.line.filter(d => d.ab === "bramble" && d.state === "exh")) await this.dropDog(p, d, "Bramble is spent");
       if (!this.rules.gEmptyOk && !p.scratched && !this.over && !p.line.length) {
         p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
@@ -2284,7 +2297,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 10:40 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 12:30 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2633,7 +2646,8 @@ function gActionsHTML(p, st) {
   h += btn("ggo", "Run", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
   const mustHitch = !p.line.length && hand.length;
   if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
-  if (!L.atOpenCP) h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest || mustHitch });
+  const stuck = p.line.length && p.line.every(d => d.state === "rested") && !hand.length && !(n && n.ok);
+  if (!L.atOpenCP) h += btn("gcamp", "Camp", stuck ? "Your team is already rested, you have no dogs in hand and you still can't cover the next trail. Camping now scratches you." : `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest || mustHitch });
   h += `</div>`;
 
   if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}" ${!st.ret.has(d.id) && st.ret.size >= p.line.length - 1 ? "disabled" : ""}>${esc(d.name)}</button>`).join("")}</div><div class="small">At least one dog stays hitched. An empty gangline is scratched.</div>`;
@@ -3042,7 +3056,7 @@ function rulesHTML() {
     <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
     <li><b>3. Event:</b> draw one Event after you Run or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.</li>
-    <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe.</li></ul></details>
+    <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe from that. You're also scratched if you camp in the open when every dog in your gangline is already rested, you have no dogs in your hand, and your Speed still can't cover the next trail.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
     <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed, role bonus and any ability printed on their tired half. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
     <li>Lead bonus +1 if a Lead dog is at the front, Wheel bonus +1 if a Wheel dog is at the back, with at least 2 dogs that aren't exhausted. Drafting: a trail's Difficulty is 1 less if another musher is on or past it.</li></ul></details>
@@ -3320,7 +3334,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 10:40 AM";
+const LT_BUILD = "Oct 16, 12:30 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
