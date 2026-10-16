@@ -469,7 +469,7 @@ const LT = (() => {
       "Cocoa": ["While Cocoa is on your gangline, camping in the open also returns one used gear.", ""],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
       "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
-      "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
+      "Boulder": ["While Boulder is on your gangline and rested, Events can't move you back a trail.", ""],
     },
     gear: {
       "Booties": "The first step of this Run doesn't tire a dog.",
@@ -866,7 +866,7 @@ const LT = (() => {
     }
     moveBack(p) {
       if (p.pos < 0) return;
-      const anchor = (this.rules.gLineOnly && this.format === "gangline" ? p.line : p.dogs).find(d => d.ab === "anchor" && d.state === "rested");
+      const anchor = (this.format === "gangline" ? p.line : p.dogs).find(d => d.ab === "anchor" && d.state === "rested"); // Gangline: only from the gangline
       if (anchor) { this.log(`${anchor.name} digs in. ${p.name} doesn't move back.`, "good"); return; }
       if (p.pos === 0) { p.pos = -1; this.log(`${p.name} is pushed back to the start.`, "bad"); return; }
       if (this.path[p.pos].type === "CP" || this.path[p.pos - 1].type === "CP") return;
