@@ -438,23 +438,25 @@ const LT = (() => {
     ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
     ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Drop it, unless you have a rested Wheel dog in your hand."],
     ["Whiteout", 2, "Drop one tired or exhausted dog. Skip your next turn. Turn your musher sideways as a reminder."],
-    ["Sore Paws", 2, "One of your tired dogs becomes exhausted."],
+    ["Paws", 2, "One of your tired dogs becomes exhausted."],
     ["Steep Climb", 1, "All your tired dogs become exhausted."],
     ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
   ];
   // Gangline mode (prototype): one Event every turn, aimed at the team on the table.
+  // Gangline mode: the same Event cards as Classic (same names and counts), with Gangline effects.
   const G_EVENTS = [
-    ["Deep Snow", 4, "Your Lead dog becomes tired."],
-    ["Long Climb", 3, "Every rested Team dog in your line becomes tired."],
-    ["Cold Snap", 4, "One tired dog in your line becomes exhausted."],
-    ["Steep Climb", 1, "Every tired dog in your line becomes exhausted."],
-    ["Tangled Lines", 2, "Move your Lead dog to the back of your line."],
-    ["Bitter Cold", 4, "Drop an exhausted dog. If you have none, one tired dog becomes exhausted."],
-    ["Blizzard", 2, "Drop an exhausted dog. Then move back one trail, but never past a checkpoint."],
-    ["Whiteout", 1, "You can't Run on your next turn."],
-    ["Second Wind", 2, "One tired dog in your line becomes rested."],
-    ["Tailwind", 2, "Keep this card. Your next Run gets +2 Speed, then discard it."],
     ["Clear Skies", 2, "No effect."],
+    ["Northern Lights", 1, "Keep this card. Your next Run gets +2 Speed, then discard it."],
+    ["Tailwind", 2, "Keep this card. Your next Run gets +1 Speed, then discard it."],
+    ["Fresh Snow", 2, "Keep this card. On your next Run, every trail has 1 more Difficulty. Then discard this card."],
+    ["Bitter Cold", 8, "Drop an exhausted dog. If you have none, one tired dog becomes exhausted."],
+    ["Blizzard", 3, "Drop an exhausted dog. Then move back one trail, but never past a checkpoint."],
+    ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
+    ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Drop it, unless the back dog of your gangline is a rested Wheel dog."],
+    ["Whiteout", 2, "You can't Run on your next turn."],
+    ["Paws", 2, "One of your tired dogs becomes exhausted."],
+    ["Steep Climb", 1, "All your tired dogs become exhausted."],
+    ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
   ];
   const EVENT_TEXT = Object.fromEntries(EVENTS.map(e => [e[0], e[2]]));
   // Gangline mode: cards whose printed text doesn't match how they work in this format.
@@ -486,7 +488,7 @@ const LT = (() => {
   const G_START = { name: "Starting Chute", cost: 2 };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
   const HARSH = {
-    "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
+    "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Paws": 4,
     "Moose on the Trail": 5, "Steep Climb": 5, "Whiteout": 6, "Bitter Cold": 7, "Squirrel!": 7, "Blizzard": 8,
   };
 
@@ -844,7 +846,7 @@ const LT = (() => {
           p.skip += 1;
           this.log(`${p.name} will skip their next turn.`, "bad");
           break;
-        case "Sore Paws": if (this.tired(p).length) await this.exhaustOne(p, e); break;
+        case "Paws": if (this.tired(p).length) await this.exhaustOne(p, e); break;
         case "Steep Climb": this.tired(p).forEach(d => d.state = "exh"); break;
         case "Lost Bootie":
           if (p.gear.length) {
@@ -1292,7 +1294,7 @@ const LT = (() => {
       p.shadowTurn = line0.some(x => x.st === "rested" && x.dog.ab === "shadow");
       if (this.rules.gTireAll) for (const d of p.line.slice(1)) this.gTire(d);
       const start = p.pos;
-      const bonus0 = p.runBonus, kept0 = p.keptEvents.length;
+      const bonus0 = p.runBonus, kept0 = p.keptEvents.length, cost0 = p.costMod;
       let moved = 0;
       const runEvents = [];
       this.log(`${p.name} sets off: Speed ${this.gSpeed(p, gearSel).total}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}.`, "act");
@@ -1335,7 +1337,7 @@ const LT = (() => {
         await this.claim(p, line0, at);
       }
       // Tailwind cards kept before this Go are used up; one drawn while pressing on waits for your next Go
-      p.runBonus -= bonus0; p.keptEvents = p.keptEvents.slice(kept0); p.costMod = 0; p.campedLast = false;
+      p.runBonus -= bonus0; p.keptEvents = p.keptEvents.slice(kept0); p.costMod -= cost0; p.campedLast = false;
       if (this.rules.gBrambleRested) { if (moved) for (const x of line0) if (x.st === "rested" && x.dog.ab === "bramble" && p.line.includes(x.dog) && x.dog.state !== "exh") { x.dog.state = this.rules.gBrambleTired ? "tired" : "exh"; this.log(`Bramble ran rested and is ${x.dog.state === "exh" ? "exhausted" : "tired"}.`, ""); } }
       else if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
@@ -1421,7 +1423,29 @@ const LT = (() => {
         case "Blizzard": await dropExh(this.rules.gBlizTired); if (!p.scratched) this.moveBack(p); break;
         case "Whiteout": p.noGo = true; this.log(`${p.name} can't Run next turn.`, "bad"); break;
         case "Second Wind": { const d = await pickLine(d => d.state === "tired" || ((this.rules.gEvV2 || this.rules.gEvWind2) && d.state === "exh"), "Choose a dog to recover one step."); if (d) { d.state = d.state === "exh" ? "tired" : "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
-        case "Tailwind": p.runBonus += 2; p.keptEvents.push(e); break;
+        case "Tailwind": p.runBonus += 1; p.keptEvents.push(e); break;
+        case "Northern Lights": p.runBonus += 2; p.keptEvents.push(e); break;
+        case "Fresh Snow": p.costMod += 1; p.keptEvents.push(e); break;
+        case "Moose on the Trail": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } else this.moveBack(p); break; }
+        case "Squirrel!": {
+          const back = line[line.length - 1];
+          if (back && back.role === "Wheel" && back.state === "rested") { this.log(`${back.name} keeps the team in line. The squirrel gets away.`, "good"); break; }
+          const pool = line.filter(d => d.state !== "rested");
+          if (!pool.length) break;
+          const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: "Choose a tired or exhausted dog." });
+          await this.dropDog(p, pool.find(d => d.id === id) || pool[0], e);
+          break;
+        }
+        case "Paws": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
+        case "Lost Bootie":
+          if (p.gear.length) {
+            const id = await this.ask(p, { type: "lostBootie", options: p.gear.map(g => g.id) });
+            const g = p.gear.find(x => x.id === id) || p.gear[0];
+            p.gear.splice(p.gear.indexOf(g), 1);
+            this.gearDeck.unshift(g);
+            this.log(`${p.name} loses ${g.name} to the bottom of the Gear deck.`, "bad");
+          }
+          break;
         default: break;
       }
       this.upd();
@@ -1854,7 +1878,7 @@ function artFor(keys) {
   ART.cache.set(ck, found);
   return found;
 }
-const ALIAS = { "Wax the Runners": ["wax", "waxrunners"], "Moose on the Trail": ["moose", "mooseonthetrail"], "Squirrel!": ["squirrel"], "Sore Paws": ["paws"],
+const ALIAS = { "Wax the Runners": ["wax", "waxrunners"], "Moose on the Trail": ["moose", "mooseonthetrail"], "Squirrel!": ["squirrel"], "Paws": ["paws", "sorepaws", "sore paws"],
   "Golden Harness": ["harness"], "Red Lantern": ["lantern"], "Northern Lights": ["aurora borealis"] };
 // Cards whose printed numbers changed since the last art export: show text until new images arrive
 const STALE_ART = new Set(["Tank", "Boulder"]);
@@ -1933,7 +1957,8 @@ const G_CP_TEXT = "Camp here once: every dog rests, take the top dog and the top
 const musherT = m => gAlt("musher", m) || LT.MUSHERS[m];
 const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : LT.EVENT_TEXT[e]) || "";
 function eventCard(e, o = {}) {
-  const url = isG() ? null : artFor(artKeys.event(e));
+  // Gangline: use the art only when the printed (Classic) text matches how the card works here
+  const url = isG() && LT.G_EVENT_TEXT[e] !== LT.EVENT_TEXT[e] ? null : artFor(artKeys.event(e));
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(e)}</div><div class="cs">Event</div><div class="cx">${esc(evText(e))}</div>`;
   return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + evText(e))}">${inner}${zb(o, "event|" + e)}</div>`;
 }
@@ -2209,7 +2234,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 7:43 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 7:46 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3205,7 +3230,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 7:43 AM";
+const LT_BUILD = "Oct 16, 7:46 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
