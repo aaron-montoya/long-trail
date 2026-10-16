@@ -438,7 +438,7 @@ const LT = (() => {
     ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
     ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Drop it, unless you have a rested Wheel dog in your hand."],
     ["Whiteout", 2, "Drop one tired or exhausted dog. Skip your next turn. Turn your musher sideways as a reminder."],
-    ["Paws", 2, "One of your tired dogs becomes exhausted."],
+    ["Sore Paws", 2, "One of your tired dogs becomes exhausted."],
     ["Steep Climb", 1, "All your tired dogs become exhausted."],
     ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
   ];
@@ -452,9 +452,9 @@ const LT = (() => {
     ["Bitter Cold", 8, "Drop an exhausted dog. If you have none, one tired dog becomes exhausted."],
     ["Blizzard", 3, "Drop an exhausted dog. Then move back one trail, but never past a checkpoint."],
     ["Moose on the Trail", 2, "A moose blocks the way. One tired dog becomes exhausted. If you have none, move back one trail."],
-    ["Squirrel!", 1, "A tired or exhausted dog chases a squirrel all the way home. Drop it, unless the back dog of your gangline is a rested Wheel dog."],
+    ["Squirrel!", 1, "Your front dog moves to the back of your gangline."],
     ["Whiteout", 2, "You can't Run on your next turn."],
-    ["Paws", 2, "One of your tired dogs becomes exhausted."],
+    ["Sore Paws", 2, "One of your tired dogs becomes exhausted."],
     ["Steep Climb", 1, "All your tired dogs become exhausted."],
     ["Lost Bootie", 1, "Put one gear from your hand on the bottom of the Gear deck."],
   ];
@@ -488,7 +488,7 @@ const LT = (() => {
   const G_START = { name: "Starting Chute", cost: 2 };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
   const HARSH = {
-    "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Paws": 4,
+    "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
     "Moose on the Trail": 5, "Steep Climb": 5, "Whiteout": 6, "Bitter Cold": 7, "Squirrel!": 7, "Blizzard": 8,
   };
 
@@ -846,7 +846,7 @@ const LT = (() => {
           p.skip += 1;
           this.log(`${p.name} will skip their next turn.`, "bad");
           break;
-        case "Paws": if (this.tired(p).length) await this.exhaustOne(p, e); break;
+        case "Sore Paws": if (this.tired(p).length) await this.exhaustOne(p, e); break;
         case "Steep Climb": this.tired(p).forEach(d => d.state = "exh"); break;
         case "Lost Bootie":
           if (p.gear.length) {
@@ -891,7 +891,7 @@ const LT = (() => {
     // Drop one particular dog (Huckle and the Sled Basket can still save it)
     async dropDog(p, v, cause) {
       if (p.scratched || !p.dogs.includes(v)) return;
-      if (v.ab === "hardy" && !v.hardyUsed && v.state !== "rested") {
+      if (v.ab === "hardy" && !v.hardyUsed && v.state !== "rested" && !(this.format === "gangline" && v.state === "exh")) {
         v.hardyUsed = true; v.state = "exh";
         this.log(`${v.name} toughs it out and is only exhausted (${cause}).`, "good");
         return;
@@ -1146,7 +1146,7 @@ const LT = (() => {
     }
 
     shadowSafe(p) {
-      if (this.format === "gangline") return p.line.some(d => d.ab === "shadow"); // Gangline: on the gangline, rested or tired
+      if (this.format === "gangline") return p.line.some(d => d.ab === "shadow" && d.state !== "exh"); // Gangline: on the gangline, rested or tired
       return p.shadowTurn || p.dogs.some(d => d.ab === "shadow" && d.state === "rested");
     }
     refreshDogs(p) { p.dogs.forEach(d => { if (d.state !== "rested") d.state = "rested"; }); }
@@ -1361,7 +1361,7 @@ const LT = (() => {
       const here = p.pos >= 0 ? this.path[p.pos] : null;
       this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
       if (p.musher === "Trapper" && p.after && !this.rules.gTrapNoCamp) await this.drawDogs(p, 1, 1, "Trapper");
-      const cocoaOnLine = p.line.some(d => d.ab === "cocoa"); // Cocoa works from the gangline in this format
+      const cocoaOnLine = p.line.some(d => d.ab === "cocoa" && d.state !== "exh"); // Cocoa works from the gangline, rested or tired
       for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
       let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
       if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
@@ -1427,16 +1427,8 @@ const LT = (() => {
         case "Northern Lights": p.runBonus += 2; p.keptEvents.push(e); break;
         case "Fresh Snow": p.costMod += 1; p.keptEvents.push(e); break;
         case "Moose on the Trail": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } else this.moveBack(p); break; }
-        case "Squirrel!": {
-          const back = line[line.length - 1];
-          if (back && back.role === "Wheel" && back.state === "rested") { this.log(`${back.name} keeps the team in line. The squirrel gets away.`, "good"); break; }
-          const pool = line.filter(d => d.state !== "rested");
-          if (!pool.length) break;
-          const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: "Choose a tired or exhausted dog." });
-          await this.dropDog(p, pool.find(d => d.id === id) || pool[0], e);
-          break;
-        }
-        case "Paws": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
+        case "Squirrel!": if (line.length > 1) { const f = line.shift(); line.push(f); this.log(`${f.name} chases a squirrel to the back of the line.`, "bad"); } break;
+        case "Sore Paws": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
         case "Lost Bootie":
           if (p.gear.length) {
             const id = await this.ask(p, { type: "lostBootie", options: p.gear.map(g => g.id) });
@@ -1878,7 +1870,7 @@ function artFor(keys) {
   ART.cache.set(ck, found);
   return found;
 }
-const ALIAS = { "Wax the Runners": ["wax", "waxrunners"], "Moose on the Trail": ["moose", "mooseonthetrail"], "Squirrel!": ["squirrel"], "Paws": ["paws", "sorepaws", "sore paws"],
+const ALIAS = { "Wax the Runners": ["wax", "waxrunners"], "Moose on the Trail": ["moose", "mooseonthetrail"], "Squirrel!": ["squirrel"], "Sore Paws": ["paws", "sorepaws", "sore paws"],
   "Golden Harness": ["harness"], "Red Lantern": ["lantern"], "Northern Lights": ["aurora borealis"] };
 // Cards whose printed numbers changed since the last art export: show text until new images arrive
 const STALE_ART = new Set(["Tank", "Boulder"]);
@@ -2234,7 +2226,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 7:46 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 7:52 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3230,7 +3222,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 7:46 AM";
+const LT_BUILD = "Oct 16, 7:52 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
