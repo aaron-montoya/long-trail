@@ -1365,9 +1365,7 @@ const LT = (() => {
       }
       if (moved) this.log(`${p.name} moves from ${this.label(start)} to ${this.label(p.pos)}.`, "act");
       if (!p.scratched && moved) {
-        let at = p.pos;
-        if (this.path[at] && this.path[at].type === "CP" && at - 1 > start && this.path[at - 1].type === "T") at = at - 1;
-        await this.claim(p, line0, at);
+        await this.claim(p, line0, p.pos); // Gangline: you only take a reward if your Run ends on that trail
       }
       // Tailwind cards kept before this Go are used up; one drawn while pressing on waits for your next Go
       p.runBonus -= bonus0; p.keptEvents = p.keptEvents.slice(kept0); p.costMod -= cost0; p.campedLast = false;
@@ -2272,7 +2270,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 8:36 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 8:39 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3006,7 +3004,7 @@ function rulesHTML() {
     <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line. If your line is empty, you must hitch.</li>
-    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop (if you stop at a checkpoint, you may take the reward on the trail just before it).</li>
+    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
     <li><b>3. Event:</b> draw one Event after you Run or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.</li>
     <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe.</li></ul></details>
@@ -3283,7 +3281,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 8:36 AM";
+const LT_BUILD = "Oct 16, 8:39 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
