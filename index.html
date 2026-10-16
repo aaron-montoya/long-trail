@@ -418,7 +418,7 @@ const LT = (() => {
   ];
   const TERRAIN = {
     "Snowfield": "",
-    "Starting Chute": "",
+    "Starting Chute": "Always trail 1. No Events before Checkpoint 1.",
     "River Ice": "If 3 or more dogs run onto this trail, draw 1 Event.",
     "Spruce Forest": "When you camp here, draw no Event.",
     "Exposed Ridge": "If you end your turn here, draw 1 Event.",
@@ -484,7 +484,7 @@ const LT = (() => {
     },
     musher: {
       "Veteran": ["Pressing on never makes you draw an Event.", "Final-leg trails have 1 less Difficulty for you."],
-      "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 2 extra and choose which to keep.", "When you take a trail reward, also take the top card of the Dog deck. You may exchange it for a dog on your gangline."],
+      "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 2 extra and choose which to keep.", "When you take a trail reward, also take the top card of the Dog deck. You may hitch it in place of a dog on your gangline. Drop that dog."],
     },
     noGear: ["Red Lantern"], // nothing to do without Slog
   };
@@ -1991,7 +1991,7 @@ function gearCard(g, o = {}) {
 }
 const isG = () => S.game ? S.game.format === "gangline" : S.format === "gangline";
 const gAlt = (kind, name) => isG() ? LT.G_ALT[kind][name] : null;
-const G_CP_TEXT = "Camp here once: every dog rests, take the top dog and the top gear. Draw no Event. Long Rest: the same, plus all used gear returns, then skip a turn.";
+const G_CP_TEXT = "Camp here once: every dog rests, take the top dog and the top gear. Long Rest: the same, plus all used gear returns, then skip a turn. Checkpoints never make you draw an Event.";
 const musherT = m => gAlt("musher", m) || LT.MUSHERS[m];
 const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : LT.EVENT_TEXT[e]) || "";
 function eventCard(e, o = {}) {
@@ -2272,7 +2272,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 8:32 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 8:36 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3005,13 +3005,13 @@ function rulesHTML() {
   <details class="rules" open><summary>Your turn</summary><ul>
     <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
-    <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
-    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
-    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line.</li>
+    <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line. If your line is empty, you must hitch.</li>
+    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop (if you stop at a checkpoint, you may take the reward on the trail just before it).</li>
+    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
     <li><b>3. Event:</b> draw one Event after you Run or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.</li>
     <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
-    <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed and role bonus. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
+    <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed, role bonus and any ability printed on their tired half. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
     <li>Lead bonus +1 if a Lead dog is at the front, Wheel bonus +1 if a Wheel dog is at the back, with at least 2 dogs that aren't exhausted. Drafting: a trail's Difficulty is 1 less if another musher is on or past it.</li></ul></details>
   <details class="rules"><summary>Checkpoints</summary><ul>
     <li>Camp once per checkpoint: every dog rests, take the top dog and the top gear. No Event.</li>
@@ -3283,7 +3283,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 8:32 AM";
+const LT_BUILD = "Oct 16, 8:36 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
