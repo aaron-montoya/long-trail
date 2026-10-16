@@ -418,6 +418,7 @@ const LT = (() => {
   ];
   const TERRAIN = {
     "Snowfield": "",
+    "Starting Chute": "",
     "River Ice": "If 3 or more dogs run onto this trail, draw 1 Event.",
     "Spruce Forest": "When you camp here, draw no Event.",
     "Exposed Ridge": "If you end your turn here, draw 1 Event.",
@@ -456,6 +457,27 @@ const LT = (() => {
     ["Clear Skies", 2, "No effect."],
   ];
   const EVENT_TEXT = Object.fromEntries(EVENTS.map(e => [e[0], e[2]]));
+  // Gangline mode: cards whose printed text doesn't match how they work in this format.
+  // The game shows these as text cards (no art) with this wording instead.
+  const G_ALT = {
+    dog: {
+      "Chappell": ["", "If Chappell is tired at the front and would tire again, he returns to your hand instead."],
+      "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
+      "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
+      "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
+    },
+    gear: {
+      "Booties": "Your Lead dog doesn't tire on this Go.",
+      "Dog Food": "One exhausted dog becomes rested.",
+      "Whistle": "One tired dog becomes rested.",
+      "Hot Broth": "All your tired dogs become rested.",
+    },
+    musher: {
+      "Veteran": ["No ability in Gangline (there's no Slog).", "Final-leg trails have 1 less Difficulty for you."],
+    },
+    noGear: ["Red Lantern"], // nothing to do without Slog
+  };
+  const G_START = { name: "Starting Chute", cost: 3 };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
   const HARSH = {
     "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
@@ -520,12 +542,17 @@ const LT = (() => {
         if (li < 2) this.path.push({ id: nid("c"), type: "CP", cp: li + 1 });
       });
       this.path.push({ id: nid("f"), type: "F", cost: FINISH_COST });
-      // Gangline: Trail 1 is always a plain Difficulty 5 trail.
-      if (this.format === "gangline") this.path[0] = { id: nid("t"), type: "T", name: "Snowfield", cost: 5, rtype: null, up: false, reward: null, start: true };
+      // Gangline: Trail 1 is always the Starting Chute, Difficulty 3.
+      if (this.format === "gangline") this.path[0] = { id: nid("t"), type: "T", name: G_START.name, cost: G_START.cost, rtype: null, up: false, reward: null, start: true };
       this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
 
       this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], tt: d[6] || "", state: "rested", hardyUsed: false })));
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
+      if (this.format === "gangline") {
+        this.gearDeck = this.gearDeck.filter(g => !G_ALT.noGear.includes(g.name));
+        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; d.gAlt = true; } }
+        for (const g of this.gearDeck) { const a = G_ALT.gear[g.name]; if (a) { g.text = a; g.gAlt = true; } }
+      }
       this.eventDeck = this.shuffle((this.format === "gangline" ? G_EVENTS : EVENTS).flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
       this.eventDiscard = [];
 
@@ -1620,7 +1647,7 @@ const LT = (() => {
       }
     },
   };
-  return { Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, G_EVENTS, G_EVENT_TEXT, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
+  return { Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, G_EVENTS, G_EVENT_TEXT, G_ALT, G_START, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
 })();
 
 
@@ -1759,7 +1786,7 @@ const zb = (o, spec) => o.pick ? `<button class="zoomb" data-act="zoom" data-z="
 const img = url => url ? `<img class="art" src="${esc(url)}" alt="" draggable="false">` : "";
 function dogCard(d, o = {}) {
   const st = o.state || d.state;
-  const url = o.noArt ? null : artFor(artKeys.dog(d));
+  const url = o.noArt || gAlt("dog", d.name) ? null : artFor(artKeys.dog(d));
   const cls = ["card", "dog", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : "", st === "tired" ? (url ? "tired-art" : "tired-txt") : ""].join(" ");
   const attrs = o.attrs || "";
   let inner;
@@ -1773,13 +1800,16 @@ function dogCard(d, o = {}) {
   return st === "exh" && !o.flat ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
 }
 function gearCard(g, o = {}) {
-  const url = artFor(artKeys.gear(g));
+  const url = gAlt("gear", g.name) ? null : artFor(artKeys.gear(g));
   const cls = ["card", "gear", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : ""].join(" ");
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(g.name)}</div><div class="cs">Gear</div><div class="cx">${esc(g.text)}</div>`;
   const card = `<div class="${cls}" ${o.attrs || ""} data-zoom="${esc("gear|" + g.name)}" title="${esc(g.name + ": " + g.text)}">${inner}${o.flag ? `<span class="stateflag">${esc(o.flag)}</span>` : ""}${zb(o, "gear|" + g.name)}</div>`;
   return o.used ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
 }
 const isG = () => !!(S.game && S.game.format === "gangline");
+const gAlt = (kind, name) => isG() ? LT.G_ALT[kind][name] : null;
+const G_CP_TEXT = "Camp here once: every dog rests, take the top dog and the top gear. Draw no Event. Long Rest: the same, plus all used gear returns, then skip a turn.";
+const musherT = m => gAlt("musher", m) || LT.MUSHERS[m];
 const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : LT.EVENT_TEXT[e]) || "";
 function eventCard(e, o = {}) {
   const url = isG() ? null : artFor(artKeys.event(e));
@@ -1787,8 +1817,8 @@ function eventCard(e, o = {}) {
   return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + evText(e))}">${inner}${zb(o, "event|" + e)}</div>`;
 }
 function musherCard(p, o = {}) {
-  const url = artFor(artKeys.musher(p.musher));
-  const t = LT.MUSHERS[p.musher];
+  const url = gAlt("musher", p.musher) ? null : artFor(artKeys.musher(p.musher));
+  const t = musherT(p.musher);
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(p.musher)}</div><div class="cs">${p.after ? "After Long Rest" : "Before Long Rest"}</div><div class="cx">${esc(t[p.after ? 1 : 0])}</div>`;
   return `<div class="card musher" data-zoom="${esc("musher|" + p.musher + "|" + (p.after ? 1 : 0))}" title="${esc(p.musher)}">${url && p.after ? inner.replace('class="art"', 'class="art" style="transform:rotate(180deg)"') : inner}</div>`;
 }
@@ -1802,8 +1832,8 @@ function backCard(kind, o = {}) {
 }
 function trailCard(c, i, o = {}) {
   if (c.type === "CP") {
-    const url = artFor(artKeys.cp(c.cp));
-    return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Difficulty 1</div><div class="cx">${esc(LT.CP_TEXT)}</div>`}</div>`;
+    const url = isG() ? null : artFor(artKeys.cp(c.cp));
+    return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Difficulty 1</div><div class="cx">${esc(isG() ? G_CP_TEXT : LT.CP_TEXT)}</div>`}</div>`;
   }
   if (c.type === "F") {
     const url = artFor(artKeys.finish());
@@ -2058,7 +2088,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 10:54 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 10:58 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2291,8 +2321,8 @@ function renderBoard() {
       <div class="mtext">
         <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
         <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · dropped: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
-        <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(LT.MUSHERS[p.musher][0])}</div>
-        <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(LT.MUSHERS[p.musher][1])}</div>
+        <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(musherT(p.musher)[0])}</div>
+        <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(musherT(p.musher)[1])}</div>
       </div>
     </div>
     <div class="tableau" aria-label="In front of you">${tz.join("") || `<span class="empty">Nothing in front of you. Every dog is rested.</span>`}</div>
@@ -2332,8 +2362,8 @@ function renderGBoard(p, myTurn) {
       <div class="mtext">
         <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
         <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · dropped: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
-        <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(LT.MUSHERS[p.musher][0])}</div>
-        <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(LT.MUSHERS[p.musher][1])}</div>
+        <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(musherT(p.musher)[0])}</div>
+        <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(musherT(p.musher)[1])}</div>
       </div>
     </div>
     <div class="tableau gline" aria-label="Your gangline"><div class="tz"><div class="label">Your gangline · front to back · Speed ${g.gSpeed(p, [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean)).total}</div><div class="row">${lineHTML || `<span class="empty">No dogs hitched.</span>`}</div></div>${tz.join("")}</div>
@@ -2719,13 +2749,15 @@ function zoomHTML(spec) {
   const [kind, a, b, c] = spec.split("|");
   if (kind === "dog") {
     const r = LT.DOGS.find(x => x[0] === a); if (!r) return "";
-    const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: r[5], tt: r[6] || "" };
+    const ga = gAlt("dog", r[0]);
+    const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: ga ? ga[0] : r[5], tt: ga ? ga[1] : (r[6] || "") };
     return `<div class="zoomview">${dogCard(d, { state: "rested", flat: true })}<div class="zt"><div class="label">${d.role} dog${b && b !== "rested" ? " · " + (b === "exh" ? "exhausted" : b) : ""}</div><h3>${esc(d.name)}</h3>
       <p>Rested Speed <b>${d.rs}</b> · Tired Speed <b>${d.ts}</b></p>${d.text ? `<p><b>Rested:</b> ${esc(d.text)}</p>` : ""}${d.tt ? `<p><b>Tired:</b> ${esc(d.tt)}</p>` : ""}${!d.text && !d.tt ? `<p class="small">No ability.</p>` : ""}
       <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first with at least one dog behind it, rested or tired." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last with at least one dog ahead of it, rested or tired." : "Team: no position bonus."} Abilities only work while the dog is rested, unless they're printed on the tired half too.</p></div></div>`;
   }
   if (kind === "gear") {
-    const r = LT.GEAR.find(x => x[0] === a); if (!r) return "";
+    const r0 = LT.GEAR.find(x => x[0] === a); if (!r0) return "";
+    const r = gAlt("gear", a) ? [r0[0], r0[1], r0[2], gAlt("gear", a)] : r0;
     const pd = S.pending, me = pd && pd.req.type === "action" && !pd.p.bot ? pd.p : null;
     const mine = me && me.gear.find(x => x.name === a && x.when === "free" && canUseFree(me, S.game, x));
     const why = me && me.gear.some(x => x.name === a) && !mine ? (r[2] === "run" ? "Tick it under “Gear for this Run” when you set up a Run." : r[2] === "camp" ? "Used when you Camp in the open (tick the box under Camp)." : r[2] === "slog" ? "Used when you Slog (tick the box under Slog)." : r[2] === "react" ? "You'll be asked to use it when a dog would be dropped." : "Nothing for it to do right now.") : "";
@@ -2733,20 +2765,20 @@ function zoomHTML(spec) {
       ${mine ? `<button class="primary" data-act="usegear" data-id="${mine.id}" style="margin-top:10px">Use ${esc(a)} now</button>` : why ? `<p class="small">${why}</p>` : ""}</div></div>`;
   }
   if (kind === "event") {
-    const r = LT.EVENTS.find(x => x[0] === a); if (!r) return "";
-    return `<div class="zoomview">${eventCard(a)}<div class="zt"><div class="label">Event · ${r[1]} in the deck</div><h3>${esc(a)}</h3><p>${esc(r[2])}</p><p class="small">On the final leg, an Event that drops a dog drops 2.</p></div></div>`;
+    const r = (isG() ? LT.G_EVENTS : LT.EVENTS).find(x => x[0] === a); if (!r) return "";
+    return `<div class="zoomview">${eventCard(a)}<div class="zt"><div class="label">Event · ${r[1]} in the deck</div><h3>${esc(a)}</h3><p>${esc(r[2])}</p>${isG() ? "" : `<p class="small">On the final leg, an Event that drops a dog drops 2.</p>`}</div></div>`;
   }
   if (kind === "musher") {
-    const t = LT.MUSHERS[a];
+    const t = musherT(a);
     return `<div class="zoomview">${musherCard({ musher: a, after: false })}<div class="zt"><div class="label">Musher</div><h3>${esc(a)}</h3>
       <p class="${b === "1" ? "small" : ""}"><b>Before Long Rest.</b> ${esc(t[0])}</p><p class="${b === "1" ? "" : "small"}"><b>After Long Rest.</b> ${esc(t[1])}</p></div></div>`;
   }
   if (kind === "trail") {
-    const t = { name: a, cost: +b, rtype: c || null, up: true, start: +b === 5 };
+    const t = { name: a, cost: +b, rtype: c || null, up: true, start: a === LT.G_START.name };
     return `<div class="zoomview">${trailCard(t, 0, { reveal: true })}<div class="zt"><div class="label">Trail · Difficulty ${b}</div><h3>${esc(a)}</h3><p>${esc(LT.TERRAIN[a] || "No terrain rule.")}</p>
       <p class="small">${c ? (c === "dog" ? "Dog reward: end your Run here to take the dog." : "Gear reward: end your Run here to take the gear.") : "No reward."} Drafting: Difficulty is 1 less if another musher is on or past it${a === "Deep Powder" ? " (3 less here)" : ""}.</p></div></div>`;
   }
-  if (kind === "cp") return `<div class="zoomview">${trailCard({ type: "CP", cp: +a }, 0)}<div class="zt"><div class="label">Checkpoint ${a} · Difficulty 1</div><h3>Checkpoint</h3><p>${esc(isG() ? "Camp here once: every dog rests, take the top dog and the top gear. Draw no Event. Long Rest: the same, plus all used gear returns, then skip a turn." : LT.CP_TEXT)}</p><p class="small">Every musher takes exactly one Long Rest, at either checkpoint, and must take it before passing Checkpoint 2.</p></div></div>`;
+  if (kind === "cp") return `<div class="zoomview">${trailCard({ type: "CP", cp: +a }, 0)}<div class="zt"><div class="label">Checkpoint ${a} · Difficulty 1</div><h3>Checkpoint</h3><p>${esc(isG() ? G_CP_TEXT : LT.CP_TEXT)}</p><p class="small">Every musher takes exactly one Long Rest, at either checkpoint, and must take it before passing Checkpoint 2.</p></div></div>`;
   if (kind === "finish") return `<div class="zoomview">${trailCard({ type: "F" }, 0)}<div class="zt"><div class="label">Difficulty ${LT.FINISH_COST}</div><h3>Finish</h3><p>${esc(LT.FINISH_TEXT)}</p></div></div>`;
   if (kind === "back") return `<div class="zoomview">${backCard("trail")}<div class="zt"><h3>Face-down trail</h3><p>Flips when a musher moves onto the trail before it.</p></div></div>`;
   return "";
@@ -2756,7 +2788,7 @@ function rulesHTML() {
   const g = S.game;
   if ((g ? g.format : S.format) === "gangline") return `<h3>Long Trail · Gangline (prototype)</h3>
   <details class="rules" open><summary>Your turn</summary><ul>
-    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always Difficulty 5.</li>
+    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 3.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
     <li><b>2. Go:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Your Lead dog (the front dog) tires: rested → tired → exhausted. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. Take the reward where you stop.</li>
@@ -3031,7 +3063,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 10:54 PM";
+const LT_BUILD = "Oct 15, 10:58 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
