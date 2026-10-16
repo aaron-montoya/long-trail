@@ -246,6 +246,110 @@ button.ghost { background: transparent; }
 .times th, .times td { text-align: left; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .times th { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .menubtn { display: none; }
+
+/* ---------- Fit-to-screen game layout (no page scrolling) ---------- */
+html.fit #app.game { max-width: none; height: 100vh; height: 100dvh; box-sizing: border-box; padding-block: 8px; overflow: hidden;
+  display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) var(--railw, 420px);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-areas: "top top" "strip strip" "players side" "board side"; }
+html.fit #app.game .top, html.fit #app.game .stripbox, html.fit #app.game .players { min-height: max-content; }
+html.fit.tight #app.game .top { flex-wrap: nowrap; }
+html.fit.tight #app.game .top .meta { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; min-width: 0; flex: 1 1 auto; scrollbar-width: none; }
+html.fit.tight #app.game .top .tools { flex: none; flex-wrap: nowrap; }
+html.fit.tight #app.game .top .tools .opt { display: none; }
+html.fit.tight #app.game .menubtn { display: inline-block; }
+html.fit.tight #app.game .top.showtools { flex-wrap: wrap; }
+html.fit.tight #app.game .top.showtools .tools { flex-wrap: wrap; }
+html.fit.tight #app.game .top.showtools .tools .opt { display: inline-flex; }
+html.fit #app.game .top { grid-area: top; margin: 0; }
+html.fit #app.game > #modal, html.phone #app.game > #modal { display: contents; }
+html.fit #app.game .stripbox { grid-area: strip; padding: 4px 10px 6px; }
+html.fit #app.game .main { display: contents; }
+html.fit #app.game .board { grid-area: board; min-height: 0; overflow: auto; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 10px 12px; align-content: start; }
+html.fit #app.game .board > .waiting { grid-column: 1 / -1; }
+html.fit #app.game .board .musherrow { grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; align-items: center; }
+html.fit #app.game .board .musherrow > .card { --w: calc(var(--handw) * .7); }
+html.fit #app.game .board .mtext { font-size: 12.5px; max-width: calc(var(--handw) * .9); text-align: center; }
+html.fit #app.game .board .mtext h2 { font-size: 15px; }
+html.fit #app.game .board .mtext .side { display: none; }
+html.fit #app.game .board .tableau { grid-column: 2; grid-row: 1; margin: 0; flex-wrap: nowrap; overflow-x: auto; align-items: flex-start; }
+html.fit #app.game .board .tableau .row { flex-wrap: nowrap; }
+html.fit #app.game .board .tableau .tz + .tz .card { --w: calc(var(--handw) * .62); }
+html.fit #app.game .board .handzone { grid-column: 1 / -1; grid-row: 2; margin: 0; min-width: 0; }
+html.fit #app.game .board .hand { flex-wrap: nowrap; overflow-x: auto; padding: 6px 2px 6px; }
+html.fit #app.game .players { grid-area: players; margin: 0; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px; }
+html.fit #app.game .players .pl { padding: 4px 8px; }
+html.fit #app.game .players .pl .last { display: none; }
+html.fit #app.game .players .pl .chips { margin-top: 2px; }
+html.fit #app.game .players .chip { font-size: 11.5px; }
+html.fit #app.game .rail { grid-area: side; position: static; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+html.fit #app.game .rail .runpanel { flex: 0 1 auto; min-height: 0; overflow: auto; }
+html.fit #app.game .rail .logbox { flex: 1 1 0; }
+html.fit #app.game .runpanel { padding: 10px; }
+html.fit #app.game .runpanel .acts { margin-top: 6px; gap: 6px; }
+html.fit #app.game .runpanel .acts .act { padding: 7px 10px; }
+html.fit #app.game .runpanel h3 { font-size: 17px; }
+html.fit #app.game .logbox { margin: 0; min-height: 0; overflow: auto; padding-top: 0; }
+html.fit #app.game .logbox summary { position: sticky; top: 0; background: var(--panel); padding-top: 10px; z-index: 1; }
+html.fit #app.game .log { max-height: none; }
+html.fit #app.game .slot { position: relative; }
+html.fit #app.game .slot .rewmini { position: absolute; z-index: 3; --w: calc(var(--stripw) * .5); left: 55%; top: calc(24px + var(--stripw) * .62); transform: rotate(5deg); box-shadow: 0 2px 6px rgb(0 0 0 / .35); }
+html.fit #app.game .startcard { width: calc(var(--stripw) * .6); height: calc(var(--stripw) * 1.397); }
+
+/* Gangline: two staggered columns, front dog at the top, like the cards on the table */
+.board .tableau .zig .card { --w: var(--handw); }
+/* an exhausted dog lies sideways but stays inside its own spot in the team */
+.zig .exhwrap { --w: calc(var(--handw) * .716) !important; margin-top: calc(var(--handw) * .34); }
+.board .tableau .zig .exhwrap .card { --w: calc(var(--handw) * .716); }
+html.fit #app.game .board.gboard .tableau.gline .label { max-width: calc(var(--handw) * 2 + 14px); }
+.zig { --slotH: calc(var(--handw) * 1.397 + 6px); position: relative; width: calc(var(--handw) * 2 + 14px); height: calc((var(--gn) + 1) * var(--slotH) / 2); margin-top: 4px; }
+.zig .zignum { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); z-index: 6; font-size: 10.5px; font-weight: 700; line-height: 1; padding: 2px 6px; border-radius: 9px; background: var(--ink); color: var(--card); white-space: nowrap; }
+.zig .zignum.front { background: var(--lead); color: #fff; } .zig .zignum.back { background: var(--wheel); color: #fff; }
+.zig { padding-top: 6px; }
+.zig .gslot { position: absolute; left: calc(var(--col) * (var(--handw) + 14px)); top: calc(var(--row) * var(--slotH) / 2); z-index: calc(10 - var(--row)); }
+.board .tableau.gline { flex-direction: column; align-items: flex-start; }
+html.phone .board .tableau.gline { align-items: center; }
+html.phone .board .tableau.gline .tz { display: flex; flex-direction: column; align-items: center; }
+html.fit #app.game .board.gboard { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+html.fit #app.game .board.gboard .tableau.gline { grid-column: 1; grid-row: 1 / span 2; overflow: visible; flex-wrap: nowrap; }
+html.fit #app.game .board.gboard .musherrow { grid-column: 2; grid-row: 1; flex-direction: row; align-items: flex-start; gap: 12px; }
+html.fit #app.game .board.gboard .musherrow > .card { --w: calc(var(--handw) * .55); }
+html.fit #app.game .board.gboard .mtext { max-width: 52ch; text-align: left; }
+html.fit #app.game .board.gboard .mtext .side { display: block; padding: 3px 6px; font-size: 12.5px; }
+html.fit #app.game .board.gboard .handzone { grid-column: 2; grid-row: 2; }
+html.fit #app.game .board.gboard .hand { flex-wrap: wrap; overflow: visible; }
+/* Phone: the whole race on one portrait screen; the turn panel and log scroll inside */
+html.phone #app.game { height: 100vh; height: 100dvh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; gap: 6px; padding-block: 6px; }
+html.phone body.hasbar #app.game { height: calc(100dvh - 76px - env(safe-area-inset-bottom, 0px)); }
+html.phone body.hasbar { padding-bottom: 0; }
+html.phone #app.game > * { flex: none; margin: 0; }
+html.phone #app.game .main { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+html.phone #app.game .rail { position: static; }
+html.phone #app.game .board .musherrow { align-items: center; }
+html.phone #app.game .board .musherrow > .card { --w: 46px; }
+html.phone #app.game .board .mtext h2 { font-size: 15px; }
+html.phone #app.game .board .mtext .side { display: none; }
+html.phone #app.game .tableau { margin-top: 6px; }
+html.phone #app.game .handzone { margin-top: 6px; }
+html.phone #app.game .players { margin: 0; }
+html.phone #app.game .players .pl { padding: 4px 8px; }
+html.phone #app.game .logbox { padding: 6px 10px; }
+html.phone #app.game .top { flex-wrap: nowrap; }
+html.phone #app.game .top .meta { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; order: 0; flex: 1 1 auto; min-width: 0; scrollbar-width: none; }
+html.phone #app.game .top h1 { display: none; }
+html.phone #app.game .top .tools { flex: none; flex-wrap: nowrap; }
+html.phone #app.game .top.showtools { flex-wrap: wrap; }
+html.phone #app.game .top.showtools .tools { flex: 1 1 100%; flex-wrap: wrap; }
+html.fit body, html.phone body { margin: 0; }
+html.phone #app.game .players .pl { width: min(60vw, 220px); }
+html.phone #app.game .players .pl .nm .small { display: none; }
+html.phone #app.game .players .pl .chips { flex-wrap: nowrap; overflow: hidden; }
+html.phone #app.game .stripbox { padding: 4px 6px; }
+html.phone #app.game .tokens { height: 18px; }
+html.phone #app.game .logbox[open] .log { max-height: 22vh; }
+html.phone #app.game .slot { position: relative; }
+html.phone #app.game .slot .rewmini { position: absolute; z-index: 3; --w: calc(var(--stripw) * .5); left: 55%; top: calc(24px + var(--stripw) * .62); transform: rotate(5deg); box-shadow: 0 2px 6px rgb(0 0 0 / .35); }
+html.phone #app.game .startcard { width: calc(var(--stripw) * .6); height: calc(var(--stripw) * 1.397); }
 .mobilebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 6px; align-items: center;
   padding: 8px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
   background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 14px rgba(0,0,0,.18); }
@@ -2318,6 +2422,7 @@ const app = $("#app");
 function render() { if (S.screen === "setup") renderSetup(); else renderGame(true); }
 
 function renderSetup() {
+  app.classList.remove("game");
   const seats = S.seats.map((s, i) => `
     <div class="seat">
       <span class="mvseat"><button data-act="seatup" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Move seat up" title="Move up">▲</button><button data-act="seatdown" data-i="${i}" ${i === S.seats.length - 1 ? "disabled" : ""} aria-label="Move seat down" title="Move down">▼</button></span>
@@ -2335,7 +2440,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 1:00 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 2:10 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2487,9 +2592,10 @@ function renderGame(full) {
       <div class="stripbox"><div class="strip" id="strip"></div></div>
       <div class="players" id="players"></div>
       <div class="main"><div class="board" id="board"></div><div class="rail"><div class="runpanel" id="runpanel"></div></div></div>
-      <details class="logbox" id="logwrap" ${store.get("logOpen", true) ? "open" : ""}><summary><span class="label">Race log</span><span class="small" id="loglast"></span></summary><div class="log" id="log"></div></details>
+      <details class="logbox" id="logwrap" ${store.get(isNarrow() ? "logOpenPhone" : "logOpen", !isNarrow()) ? "open" : ""}><summary><span class="label">Race log</span><span class="small" id="loglast"></span></summary><div class="log" id="log"></div></details>
       <div id="modal"></div>
       <div id="mobilebar" class="mobilebar" hidden></div>`;
+    app.classList.add("game");
     renderLog(true);
   }
   const cur = g.current;
@@ -2503,6 +2609,9 @@ function renderGame(full) {
     </div>`).join("");
   renderBoard();
   buildMobileBar();
+  placeLog();
+  fitCards();
+  if (isNarrow()) { const m = $("#app .main"), k = g.round + ":" + (cur ? cur.idx : "-"); if (m && m.dataset.k !== k) { m.dataset.k = k; m.scrollTop = 0; } }
   scrollStripToAction();
   renderModal();
 }
@@ -2559,6 +2668,7 @@ function renderBoard() {
     return;
   }
   if (g.format === "gangline") return renderGBoard(p, myTurn);
+  el.classList.remove("gboard");
   const rested = g.rested(p), tired = g.tired(p), exh = g.exh(p);
   const run = myTurn ? S.run : null;
   const inLine = id => !!(run && run.line.includes(id));
@@ -2627,7 +2737,9 @@ function renderGBoard(p, myTurn) {
   const hand = g.gHand(p);
   const stName = d => d.state === "rested" ? "rested" : d.state === "tired" ? "tired" : "exhausted";
   const canHitch = myTurn && g.gCanHitch(p);
-  const lineHTML = p.line.map((d, i) => `<div class="gslot">${dogCard(d, { flag: stName(d) })}<div class="gpos">${i === 0 ? "Front · Lead" : i === p.line.length - 1 ? "Back · Wheel" : "#" + (i + 1)}</div></div>`).join("");
+  el.classList.add("gboard");
+  const lineHTML = p.line.map((d, i) => `<div class="gslot" style="--col:${i % 2};--row:${i}" title="${i === 0 ? "Front · Lead position" : i === p.line.length - 1 ? "Back · Wheel position" : "Position " + (i + 1)}">${dogCard(d, { flag: stName(d) })}<span class="zignum ${i === 0 ? "front" : i === p.line.length - 1 ? "back" : ""}">${i === 0 ? "Front" : i === p.line.length - 1 ? "Back" : i + 1}</span></div>`).join("");
+  const gn = Math.max(1, isFit() ? (g.rules.lineMax || 4) : p.line.length);
   const tz = [];
   if (p.used.length) tz.push(`<div class="tz"><div class="label">Used gear · back at your Long Rest</div><div class="row">${p.used.map(gr => gearCard(gr, { used: true })).join("")}</div></div>`);
   if (p.keptEvents.length) tz.push(`<div class="tz"><div class="label">Kept Events · next Run</div><div class="row">${p.keptEvents.map(e => eventCard(e)).join("")}</div></div>`);
@@ -2649,13 +2761,14 @@ function renderGBoard(p, myTurn) {
         <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(musherT(p.musher)[1])}</div>
       </div>
     </div>
-    <div class="tableau gline" aria-label="Your gangline"><div class="tz"><div class="label">Your gangline · front to back · Speed ${g.gSpeed(p, [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean)).total}</div><div class="row">${lineHTML || `<span class="empty">No dogs hitched.</span>`}</div></div>${tz.join("")}</div>
+    <div class="tableau gline" aria-label="Your gangline"><div class="tz"><div class="label">Your gangline · front to back · Speed ${g.gSpeed(p, [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean)).total}</div>${lineHTML ? `<div class="zig" style="--gn:${gn}">${lineHTML}</div>` : `<div class="row"><span class="empty">No dogs hitched.</span></div>`}</div>${tz.join("")}</div>
     <div class="handzone">
       <div class="label">Your hand · ${hand.length} dog${hand.length === 1 ? "" : "s"}, ${p.gear.length} gear${canHitch ? " · tap a dog to hitch it" : ""}</div>
       <div class="hand" id="hand">${items.join("") || `<span class="empty">Your hand is empty.</span>`}</div>
     </div>`;
-  if (!myTurn) { rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`; return; }
-  rp.innerHTML = gActionsHTML(p, st);
+  if (!myTurn) rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`;
+  else rp.innerHTML = gActionsHTML(p, st);
+  if (typeof fitCards === "function") requestAnimationFrame(fitCards);
 }
 function gActionsHTML(p, st) {
   const g = S.game, pd = S.pending, noGo = !!(pd && pd.req.noGo);
@@ -3175,6 +3288,41 @@ function applySize() {
   const vw = { S: 26, M: 31, L: 40 }[S.cardSize] || 31;
   document.documentElement.style.setProperty("--handw", narrow ? `min(${h}px, ${vw}vw)` : `min(${h}px, 40vw)`);
   document.documentElement.style.setProperty("--stripw", narrow ? `min(${s}px, ${vw - 13}vw)` : `min(${s}px, 19vw)`);
+  fitCards();
+}
+// Fit layout: the race log lives in the right column under the turn panel
+function placeLog() {
+  const log = $("#logwrap"), rail = $("#app .rail"), main = $("#app .main");
+  if (!log || !rail || !main) return;
+  if (isFit()) { if (log.parentElement !== rail) rail.appendChild(log); }
+  else if (log.parentElement === rail) main.after(log);
+}
+// Size the cards so the trail, your gangline and your hand all fit on one screen.
+function fitCards() {
+  const root = document.documentElement.style, g = S.game;
+  if (S.screen !== "game" || !g) return;
+  const W = window.innerWidth, H = window.innerHeight, mult = { S: .85, M: 1, L: 1.15 }[S.cardSize] || 1;
+  const n = g.path.length + 1;
+  if (isFit()) {
+    const railW = Math.round(Math.max(340, Math.min(460, W * .25)));
+    root.setProperty("--railw", railW + "px");
+    const sw = Math.floor(Math.min((W - 40 - 20 - (n - 1) * 8) / n - 4, H * .15 / 1.397, 150));
+    root.setProperty("--stripw", Math.max(56, sw) + "px");
+  } else if (isNarrow()) {
+    root.setProperty("--stripw", Math.round(Math.max(50, Math.min(76, H * .085))) + "px");
+  } else return;
+  const box = isFit() ? $("#board") : $("#app .main");
+  const board = $("#board");
+  if (!box || !board) return;
+  // start from a size that fits the height, then shrink until nothing spills over
+  const L = (g.format === "gangline" ? g.rules.lineMax : 0) || 4;
+  let w = isFit() ? Math.min(230, ((box.clientHeight - 70) / ((L + 1) / 2) - 6) / 1.397) : Math.min(140, (box.clientHeight - 150) / 2.9);
+  w = Math.max(isFit() ? 78 : 92, Math.floor(w * mult));
+  root.setProperty("--handw", w + "px");
+  const target = () => isFit() ? box.clientHeight : box.clientHeight;
+  for (let i = 0; i < 12 && w > (isFit() ? 78 : 92) && board.scrollHeight > target() + 2 && !(S.cardSize === "L"); i++) {
+    w = Math.floor(w * .93); root.setProperty("--handw", w + "px");
+  }
 }
 
 function wantPhone() {
@@ -3187,7 +3335,13 @@ function wantPhone() {
   const w = Math.min(window.innerWidth || 9999, (window.screen && window.screen.width) || 9999);
   return (touch || mobileUA) && w <= 1180;
 }
-function applyLayout() { document.documentElement.classList.toggle("phone", wantPhone()); }
+function applyLayout() {
+  const phone = wantPhone();
+  document.documentElement.classList.toggle("phone", phone);
+  document.documentElement.classList.toggle("fit", !phone && window.innerWidth >= 1000 && window.innerHeight >= 560);
+  document.documentElement.classList.toggle("tight", window.innerWidth < 1600);
+}
+const isFit = () => document.documentElement.classList.contains("fit");
 const isNarrow = () => document.documentElement.classList.contains("phone");
 // Keep the part of the trail where the action is in view on small screens.
 function scrollStripToAction() {
@@ -3382,14 +3536,14 @@ document.addEventListener("drop", e => {
   S.dragId = null; renderGame();
 });
 document.addEventListener("dragend", () => { S.dragId = null; document.querySelectorAll(".dragging,.over").forEach(x => x.classList.remove("dragging", "over")); });
-document.addEventListener("toggle", e => { if (e.target && e.target.id === "logwrap") store.set("logOpen", e.target.open); }, true);
+document.addEventListener("toggle", e => { if (e.target && e.target.id === "logwrap") store.set(isNarrow() ? "logOpenPhone" : "logOpen", e.target.open); }, true);
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && S.overlay && S.overlay.type === "zoom") { S.overlay = S.overlay.prev || null; if (S.screen === "setup" && !S.overlay) { const m = $("#modal"); if (m) m.remove(); } else renderModal(); return; }
   if (e.key === "Escape" && S.overlay && (S.overlay.type === "rules" || S.overlay.type === "freepick" || S.overlay.type === "artcheck")) { S.overlay = null; renderModal(); }
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 1:00 PM";
+const LT_BUILD = "Oct 16, 2:10 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
