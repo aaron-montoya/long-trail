@@ -384,12 +384,12 @@ const LT = (() => {
     ["Shadow", "Team", 3, 2, "shadow", "River Ice and Exposed Ridge never make you draw Events."],
     ["Bear", "Wheel", 3, 2, null, ""],
     ["Old Ben", "Wheel", 2, 3, null, ""],
-    ["Tank", "Wheel", 3, 3, "heavy", "If Tank runs, you can't move onto River Ice this Run.", "If Tank runs, you can't move onto River Ice this Run."],
+    ["Tank", "Wheel", 4, 3, "heavy", "If Tank runs, you can't move onto River Ice this Run.", "If Tank runs, you can't move onto River Ice this Run."],
     ["Anvil", "Wheel", 2, 2, "anvil", "+2 if 4 or more dogs run."],
     ["Brick", "Wheel", 1, 4, null, ""],
     ["Yukon", "Wheel", 2, 2, "yukon", "Yukon's Wheel bonus is +2.", "Yukon's Wheel bonus is +2."],
     ["Huckle", "Wheel", 2, 2, "hardy", "", "The first time Huckle would be dropped each race, he becomes exhausted instead."],
-    ["Boulder", "Wheel", 4, 3, "anchor", "While Boulder is in your hand, Events can't move you back a trail."],
+    ["Boulder", "Wheel", 3, 3, "anchor", "While Boulder is in your hand, Events can't move you back a trail."],
   ];
 
   const GEAR = [
@@ -1817,6 +1817,8 @@ function artFor(keys) {
 }
 const ALIAS = { "Wax the Runners": ["wax", "waxrunners"], "Moose on the Trail": ["moose", "mooseonthetrail"], "Squirrel!": ["squirrel"], "Sore Paws": ["paws"],
   "Golden Harness": ["harness"], "Red Lantern": ["lantern"], "Northern Lights": ["aurora borealis"] };
+// Cards whose printed numbers changed since the last art export: show text until new images arrive
+const STALE_ART = new Set(["Tank", "Boulder"]);
 const artKeys = {
   dog: d => [d.name, "dog " + d.name, d.name + " dog"],
   gear: g => [g.name, "gear " + g.name, ...(ALIAS[g.name] || [])],
@@ -1866,7 +1868,7 @@ const zb = (o, spec) => o.pick ? `<button class="zoomb" data-act="zoom" data-z="
 const img = url => url ? `<img class="art" src="${esc(url)}" alt="" draggable="false">` : "";
 function dogCard(d, o = {}) {
   const st = o.state || d.state;
-  const url = o.noArt || gAlt("dog", d.name) ? null : artFor(artKeys.dog(d));
+  const url = o.noArt || gAlt("dog", d.name) || STALE_ART.has(d.name) ? null : artFor(artKeys.dog(d));
   const cls = ["card", "dog", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : "", st === "tired" ? (url ? "tired-art" : "tired-txt") : ""].join(" ");
   const attrs = o.attrs || "";
   let inner;
@@ -2168,7 +2170,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 11:39 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 6:32 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3149,7 +3151,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 11:39 PM";
+const LT_BUILD = "Oct 16, 6:32 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
