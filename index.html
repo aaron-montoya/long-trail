@@ -461,13 +461,13 @@ const LT = (() => {
   // The game shows these as text cards (no art) with this wording instead.
   const G_ALT = {
     dog: {
-      "Chappell": ["", "If Chappell is tired at the front and would tire again, he returns to your hand instead."],
+      "Chappell": ["", "If Chappell is tired and would become exhausted, he returns to your hand instead."],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
       "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
       "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
     },
     gear: {
-      "Booties": "Your Lead dog doesn't tire on this Go.",
+      "Booties": "The first step of this Go doesn't tire a dog.",
       "Dog Food": "One exhausted dog becomes rested.",
       "Whistle": "One tired dog becomes rested.",
       "Hot Broth": "All your tired dogs become rested.",
@@ -477,7 +477,7 @@ const LT = (() => {
     },
     noGear: ["Red Lantern"], // nothing to do without Slog
   };
-  const G_START = { name: "Starting Chute", cost: 3 };
+  const G_START = { name: "Starting Chute", cost: 2 };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
   const HARSH = {
     "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
@@ -542,7 +542,7 @@ const LT = (() => {
         if (li < 2) this.path.push({ id: nid("c"), type: "CP", cp: li + 1 });
       });
       this.path.push({ id: nid("f"), type: "F", cost: FINISH_COST });
-      // Gangline: Trail 1 is always the Starting Chute, Difficulty 3.
+      // Gangline: Trail 1 is always the Starting Chute, Difficulty 2.
       if (this.format === "gangline") this.path[0] = { id: nid("t"), type: "T", name: G_START.name, cost: G_START.cost, rtype: null, up: false, reward: null, start: true };
       this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
 
@@ -1218,12 +1218,22 @@ const LT = (() => {
       const blocked = c.type === "T" && c.name === "River Ice" && tank;
       return { nxt, c, speed: sp, cost, ok: !blocked && sp >= cost, blocked };
     }
+    // Would one more step leave every dog in the line exhausted?
+    gStepSpends(p) {
+      const st = p.line.map(d => d.state);
+      const t = s => s === "rested" ? "tired" : "exh";
+      const i = st.findIndex(s => s !== "exh");
+      if (i >= 0) st[i] = t(st[i]);
+      if (this.rules.gTire2 && st.length > 1) st[1] = t(st[1]);
+      return st.length > 0 && st.every(s => s === "exh");
+    }
     gTire(d) {
       if (d.state === "rested") d.state = "tired";
       else if (d.state === "tired") d.state = "exh";
     }
+    // Each step, the front-most dog that isn't exhausted tires: the first dog gets tired, then exhausted, then the second dog, and so on.
     async gTireLead(p, why) {
-      const f = p.line[0];
+      const f = p.line.find(d => d.state !== "exh");
       if (!f) return;
       if (f.state === "tired" && f.ab === "northstar") { // Chappell: returns to your hand instead of becoming exhausted
         p.line.shift(); f.state = "rested";
@@ -1234,14 +1244,17 @@ const LT = (() => {
       this.gTire(f);
       if (f.state !== was) this.log(`${f.name} ${f.state === "tired" ? "tires" : "is exhausted"} (${why}).`, f.state === "exh" ? "bad" : "");
     }
+    // One dog per turn; with rules.gFirstHitch, your first turn lets you hitch that many.
+    gHitchLimit(p) { return (p.gTurnN || 0) <= 1 && this.rules.gFirstHitch ? this.rules.gFirstHitch : 1; }
+    gCanHitch(p) { return (p.hitchN || 0) < this.gHitchLimit(p) && this.gHand(p).length > 0 && (!this.rules.lineMax || p.line.length < this.rules.lineMax); }
     gHitch(p, id, end) {
-      if (p.hitched) return;
+      if (!this.gCanHitch(p)) return;
       const d = this.gHand(p).find(x => x.id === id);
       if (!d) return;
       if (this.rules.lineMax && p.line.length >= this.rules.lineMax) return;
       d.state = "rested";
       if (end === "front") p.line.unshift(d); else p.line.push(d);
-      p.hitched = true;
+      p.hitchN = (p.hitchN || 0) + 1;
       this.log(`${p.name} hitches ${d.name} at the ${end === "front" ? "front" : "back"}.`, "act");
       this.upd();
     }
@@ -1252,6 +1265,7 @@ const LT = (() => {
       const line0 = this.gLine(p);
       if (line0.some(x => x.dog.ab === "ignore1" && (x.st === "rested" || (x.st !== "exh" && x.dog.tt)))) p.ignoreLeft = 1;
       p.shadowTurn = line0.some(x => x.st === "rested" && x.dog.ab === "shadow");
+      if (this.rules.gTireAll) for (const d of p.line.slice(1)) this.gTire(d);
       const start = p.pos;
       let moved = 0;
       const runEvents = [];
@@ -1273,7 +1287,8 @@ const LT = (() => {
         }
         if (n.c.type === "CP") { this.log(`${p.name} reaches Checkpoint ${n.c.cp}.`, "act"); await this.vetCheck(p, n.nxt); }
         if (n.c.type === "T" && n.c.name === "River Ice" && p.line.filter(d => d.state !== "exh").length >= 3 && !this.shadowSafe(p)) runEvents.push("River Ice");
-        if (!booties) await this.gTireLead(p, "breaking trail");
+        if (!(booties && moved === 1)) await this.gTireLead(p, "breaking trail");
+        if (this.rules.gTire2 && p.line[1]) { const d2 = p.line[1]; if (d2.state === "exh" && this.rules.gLeadDrop) await this.dropDog(p, d2, "run into the ground"); else this.gTire(d2); }
         this.upd();
       }
       if (moved) this.log(`${p.name} moves from ${this.label(start)} to ${this.label(p.pos)}.`, "act");
@@ -1295,7 +1310,10 @@ const LT = (() => {
         const ids = this.nextFaceDown(p, 1);
         if (ids.length) { this.log(`${p.name}'s Scout looks at the trail ahead.`, ""); await this.tell(p, { type: "peek", trails: ids, source: "Scout" }); }
       }
-      for (const src of runEvents) { if (p.scratched) break; await this.event(p, src); }
+      if (this.rules.gStepEv) for (let i = 1; i < moved; i++) runEvents.push("pressing on");
+      if (this.rules.gEvPerTrail) { for (let i = start + 1; i <= p.pos; i++) if (this.path[i].type === "T") runEvents.push(this.label(i)); p.gWentEv = true; }
+      if (this.rules.gPushEv) for (const x of line0) if (x.st === "tired") runEvents.push("pushing " + x.dog.name);
+      for (const src of runEvents) { if (p.scratched || this.over) break; await this.event(p, src); }
     }
     // Camp in the open: every dog in the line recovers one step; you may send dogs back to your hand.
     async gCamp(p, action) {
@@ -1304,7 +1322,8 @@ const LT = (() => {
       this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
       if (p.musher === "Trapper" && p.after) await this.drawDogs(p, 1, 1, "Trapper");
       for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
-      const back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
+      let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
+      if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
       for (const d of back) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; }
       if (back.length) this.log(`${p.name} brings ${back.map(d => d.name).join(", ")} back to hand.`, "");
       const cocoa = this.gHand(p).some(d => d.ab === "cocoa");
@@ -1315,7 +1334,8 @@ const LT = (() => {
         this.log(`Cocoa curls up by the fire. ${g.name} is back in hand.`, "good");
       }
       let safe = null;
-      if (here && here.type === "T" && here.name === "Spruce Forest") safe = "The Spruce Forest shelters the team.";
+      if (here && here.type === "CP") safe = "The checkpoint shelters the team.";
+      else if (here && here.type === "T" && here.name === "Spruce Forest") safe = "The Spruce Forest shelters the team.";
       else if (p.musher === "Night Runner" && p.after) safe = "The Night Runner camps safely.";
       else if (action.bivy) {
         const b = p.gear.find(g => g.name === "Bivy Sack");
@@ -1331,11 +1351,12 @@ const LT = (() => {
         const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "exhaustDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: why });
         return pool.find(d => d.id === id) || pool[0];
       };
-      const dropExh = async () => {
+      const dropExh = async (orTired) => {
         let pool = line.filter(d => d.state === "exh");
+        if (!pool.length && orTired) pool = line.filter(d => d.state === "tired");
+        if (!pool.length) return false; // nothing to drop, so Flash is safe too
         const flash = line.filter(d => d.ab === "fragile" && d.state !== "rested");
         if (flash.length) pool = flash;
-        if (!pool.length) return false;
         const id = pool.length === 1 && p.bot ? pool[0].id : await this.ask(p, { type: "removeDog", options: pool.map(d => d.id), all: line.map(d => d.id), cause: e, reason: flash.length ? "Flash is tired or exhausted, so Flash must go." : "Choose an exhausted dog." });
         await this.dropDog(p, pool.find(d => d.id === id) || pool[0], e);
         return true;
@@ -1346,8 +1367,8 @@ const LT = (() => {
         case "Cold Snap": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
         case "Steep Climb": line.filter(d => d.state === "tired").forEach(d => d.state = "exh"); break;
         case "Tangled Lines": if (line.length > 1) { const f = line.shift(); line.push(f); this.log(`${f.name} ends up at the back of the line.`, "bad"); } break;
-        case "Bitter Cold": if (!(await dropExh())) { const d = await pickLine(d => d.state === "tired", "No exhausted dogs: choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } } break;
-        case "Blizzard": await dropExh(); if (!p.scratched) this.moveBack(p); break;
+        case "Bitter Cold": if (!(await dropExh(this.rules.gColdTired))) { const d = await pickLine(d => d.state === "tired", "No exhausted dogs: choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } } break;
+        case "Blizzard": await dropExh(this.rules.gBlizTired); if (!p.scratched) this.moveBack(p); break;
         case "Whiteout": p.noGo = true; this.log(`${p.name} can't Go next turn.`, "bad"); break;
         case "Second Wind": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to rest."); if (d) { d.state = "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
         case "Tailwind": p.runBonus += 2; p.keptEvents.push(e); break;
@@ -1357,7 +1378,11 @@ const LT = (() => {
     }
     async gTurn(p) {
       if (this.io.turnStart) await this.io.turnStart(p);
-      p.hitched = false;
+      if (this.rules.gFinal && p.pos >= 0 && this.path[p.pos].type === "T" && this.finalLeg(p.pos)) {
+        for (let i = 0; i < this.rules.gFinal && !p.scratched; i++) await this.event(p, "the final leg");
+        if (p.scratched) return;
+      }
+      p.hitchN = 0; p.gTurnN = (p.gTurnN || 0) + 1;
       const noGo = p.noGo; p.noGo = false;
       let action;
       for (let guard = 0; guard < 30; guard++) {
@@ -1378,11 +1403,43 @@ const LT = (() => {
       else if (action.type === "cp") { await this.doCampCP(p, !!action.long); quiet = "Checkpoint camp"; }
       else quiet = await this.gCamp(p, action);
       if (this.over || p.scratched) return;
+      const atCP = p.pos >= 0 && this.path[p.pos].type === "CP";
+      if (!quiet && atCP) quiet = "Safe at the checkpoint.";
+      if (!quiet && p.gWentEv) { p.gWentEv = false; quiet = "On the move."; }
       if (quiet) { if (quiet !== "Checkpoint camp") this.log(`${quiet} No Event this turn.`, "good"); }
       else await this.event(p, "the trail");
       if (p.scratched) return;
       const at = p.pos >= 0 ? this.path[p.pos] : null;
       if (at && at.type === "T" && at.name === "Exposed Ridge" && !this.shadowSafe(p)) await this.event(p, "Exposed Ridge");
+      await this.gSpentCheck(p);
+    }
+    // Optional rule: a team with no dog left that isn't exhausted can't go on.
+    async gSpentCheck(p) {
+      if (!this.rules.gEmptyOk && !p.scratched && !this.over && !p.line.length) {
+        p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
+        this.log(`${p.name}'s gangline is empty. ${p.name} is scratched.`, "bad");
+        this.upd();
+        return;
+      }
+      if (this.rules.gSpentDrop && !p.scratched && !this.over && p.line.length && !p.line.some(d => d.state !== "exh")) {
+        this.log(`${p.name}'s whole gangline is exhausted. They head home.`, "bad");
+        for (const d of p.line.slice()) { if (p.scratched) break; await this.dropDog(p, d, "spent team"); }
+        return;
+      }
+      const r = this.rules.gScratchExh;
+      if (!r || p.scratched || this.over) return;
+      if (p.line.some(d => d.state !== "exh")) return;
+      if (r === "all" && this.gHand(p).length) return;
+      if (r === "line" && !p.line.length) return;
+      if (this.rules.gScratchMin && p.line.length < this.rules.gScratchMin) return;
+      if (this.rules.gScratchAfterCP1 && p.pos < this.cpIdx[0]) return;
+      if (this.rules.gScratchFrom != null && p.pos < this.rules.gScratchFrom) return;
+      if (this.rules.gScratchNoCP && p.pos >= 0 && this.path[p.pos].type === "CP") return;
+      if (this.rules.gScratchLeg === "final" && !(p.pos > this.cpIdx[1])) return;
+      if (this.rules.gScratchLeg === "after1" && !(p.pos > this.cpIdx[0])) return;
+      p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
+      this.log(`${p.name}'s whole team is exhausted. ${p.name} is scratched.`, "bad");
+      this.upd();
     }
 
     // ---------- main loop ----------
@@ -1587,7 +1644,7 @@ const LT = (() => {
         return { type: "cp", long: false };
       }
       const hand = g.gHand(p);
-      if (!p.hitched && hand.length && (!g.rules.lineMax || p.line.length < g.rules.lineMax)) {
+      if (g.gCanHitch(p)) {
         const d = hand.slice().sort((a, b) => dogVal(b) - dogVal(a))[0];
         const f = p.line[0];
         const end = d.role === "Lead" && (!f || f.role !== "Lead" || f.state !== "rested") ? "front" : (!f || f.state === "exh") && d.role !== "Wheel" ? "front" : "back";
@@ -1603,7 +1660,8 @@ const LT = (() => {
       }
       const bivy = !!p.gear.find(x => x.name === "Bivy Sack");
       if (noGo) return { type: "camp", bivy };
-      const worn = exhN * 2 >= p.line.length && p.line.length > 0;
+      const worn = (exhN * 2 >= p.line.length && p.line.length > 0) || (g.rules.gLeadDrop && p.line[0] && p.line[0].state === "exh")
+        || g.gStepSpends(p);
       const n = g.gNext(p, []);
       if (n && n.ok && !worn) return { type: "go", gear: [] };
       // a piece of gear might get the team moving
@@ -1622,6 +1680,8 @@ const LT = (() => {
         case "gContinue": {
           const f = p.line[0];
           const live = p.line.filter(d => d.state !== "exh").length;
+          if (g.rules.gLeadDrop && f && f.state === "exh") return false;
+          if (g.gStepSpends(p)) return false;
           return !f || f.state === "rested" || live >= 4 || g.path[req.next].type !== "T";
         }
         case "removeDog": return req.options.map(byId).sort((a, b) => (a.rs + a.ts) - (b.rs + b.ts))[0].id;
@@ -2088,7 +2148,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 10:58 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 11:20 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2344,7 +2404,7 @@ function renderGBoard(p, myTurn) {
   const st = myTurn ? gState() : { sel: null, gear: new Set(), ret: new Set() };
   const hand = g.gHand(p);
   const stName = d => d.state === "rested" ? "rested" : d.state === "tired" ? "tired" : "exhausted";
-  const canHitch = myTurn && !p.hitched && hand.length && (!g.rules.lineMax || p.line.length < g.rules.lineMax);
+  const canHitch = myTurn && g.gCanHitch(p);
   const lineHTML = p.line.map((d, i) => `<div class="gslot">${dogCard(d, { flag: stName(d) })}<div class="gpos">${i === 0 ? "Front · Lead" : i === p.line.length - 1 ? "Back · Wheel" : "#" + (i + 1)}</div></div>`).join("");
   const tz = [];
   if (p.used.length) tz.push(`<div class="tz"><div class="label">Used gear · back at your Long Rest</div><div class="row">${p.used.map(gr => gearCard(gr, { used: true })).join("")}</div></div>`);
@@ -2382,34 +2442,38 @@ function gActionsHTML(p, st) {
   const hand = g.gHand(p);
   const here = p.pos >= 0 ? g.path[p.pos] : null;
   const bivy = p.gear.find(x => x.name === "Bivy Sack");
-  const safeCamp = (here && here.type === "T" && here.name === "Spruce Forest") || (p.musher === "Night Runner" && p.after);
+  const safeCamp = (here && (here.type === "CP" || (here.type === "T" && here.name === "Spruce Forest"))) || (p.musher === "Night Runner" && p.after);
   const btn = (act, title, sub, o = {}) => `<button class="act ${o.primary ? "primary" : ""}" data-act="${act}" ${o.disabled ? "disabled" : ""}><b>${title}</b><span>${sub}</span></button>`;
   let h = `<h3>Your turn</h3><div class="small">${esc(g.label(p.pos))}</div>`;
   h += `<div class="gspeed"><div><span class="small">Team Speed</span> <b class="big">${sp.total}</b></div>`;
   if (n && n.cost != null) h += `<div><span class="small">${esc(g.label(n.nxt))}</span> <b class="big">${n.cost}</b></div>`;
   h += `</div><div class="small">${sp.parts.map(([w, v]) => `${esc(w)} ${v >= 0 ? "+" : ""}${v}`).join(" · ") || "No dogs hitched."}</div>`;
-  if (!p.hitched && hand.length && (!g.rules.lineMax || p.line.length < g.rules.lineMax)) {
-    h += `<div class="label" style="margin-top:10px">1 · Hitch a dog (optional)</div>`;
+  if (g.gCanHitch(p)) {
+    const lim = g.gHitchLimit(p), left = lim - (p.hitchN || 0);
+    h += `<div class="label" style="margin-top:10px">1 · Hitch ${lim > 1 ? `up to ${left} more dog${left > 1 ? "s" : ""}` : "a dog"} (optional)</div>`;
     h += st.sel ? `<div class="row2"><button data-act="ghitch" data-v="front">At the front</button><button data-act="ghitch" data-v="back">At the back</button><button class="ghost" data-act="gsel" data-id="${st.sel}">Cancel</button></div>`
       : `<div class="small">Tap a dog in your hand, then choose front or back.</div>`;
-  } else h += `<div class="small" style="margin-top:8px">${p.hitched ? "You've hitched a dog this turn." : hand.length ? "Your line is full." : "No dogs in hand to hitch."}</div>`;
+  } else h += `<div class="small" style="margin-top:8px">${p.hitchN ? "You've hitched this turn." : hand.length ? "Your line is full." : "No dogs in hand to hitch."}</div>`;
   h += `<div class="label" style="margin-top:10px">2 · Go or Camp</div><div class="acts">`;
+  const noLine = !p.line.length && hand.length;
   if (L.atOpenCP) {
-    h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, "Every dog rests. Take the top dog and gear. No Event.", { disabled: L.mustLongRest });
-    h += btn("longrest", "Long Rest", "Every dog rests, used gear returns, take the top dog and gear, then skip a turn. No Event.", { primary: L.mustLongRest });
+    h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, "Every dog rests. Take the top dog and gear. No Event.", { disabled: L.mustLongRest || noLine });
+    h += btn("longrest", "Long Rest", "Every dog rests, used gear returns, take the top dog and gear, then skip a turn. No Event.", { primary: L.mustLongRest, disabled: noLine });
   }
   let goSub;
   if (noGo) goSub = "Whiteout: you can't Go this turn.";
   else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
   else if (n.blocked) goSub = "Tank won't step onto River Ice.";
   else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
-  else goSub = `Move onto ${g.label(n.nxt)}. Your Lead tires. Keep going while your Speed covers the next trail.`;
+  else goSub = `Move onto ${g.label(n.nxt)}. Your first dog that isn't exhausted tires. Keep going while your Speed covers the next trail.`;
   h += btn("ggo", "Go", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
-  h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest });
+  const mustHitch = !p.line.length && hand.length;
+  if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
+  if (!L.atOpenCP) h += btn("gcamp", "Camp", `Every dog in your line recovers one step (exhausted → tired → rested)${safeCamp ? ". No Event here." : ", then draw an Event."}`, { disabled: L.mustLongRest || mustHitch });
   h += `</div>`;
   if (bivy && !safeCamp) h += `<label><input type="checkbox" id="usebivy"> Use Bivy Sack if you camp (no Event)</label>`;
-  if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}">${esc(d.name)}</button>`).join("")}</div>`;
-  h += `<div class="small" style="margin-top:8px">3 · After Go or Camp, draw one Event.</div>`;
+  if (p.line.length) h += `<div class="small" style="margin-top:6px">If you camp, also send back to hand:</div><div class="row2">${p.line.map(d => `<button class="chipbtn ${st.ret.has(d.id) ? "on" : ""}" data-act="gret" data-id="${d.id}" ${!st.ret.has(d.id) && st.ret.size >= p.line.length - 1 ? "disabled" : ""}>${esc(d.name)}</button>`).join("")}</div><div class="small">At least one dog stays hitched. An empty gangline is scratched.</div>`;
+  h += `<div class="small" style="margin-top:8px">3 · After Go or Camp, draw one Event (none if you end at a checkpoint).</div>`;
   return h;
 }
 
@@ -2788,12 +2852,13 @@ function rulesHTML() {
   const g = S.game;
   if ((g ? g.format : S.format) === "gangline") return `<h3>Long Trail · Gangline (prototype)</h3>
   <details class="rules" open><summary>Your turn</summary><ul>
-    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 3.</li>
+    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
-    <li><b>2. Go:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Your Lead dog (the front dog) tires: rested → tired → exhausted. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. Take the reward where you stop.</li>
+    <li><b>2. Go:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first dog that isn't exhausted tires: the front dog gets tired, then exhausted, then the second dog, and so on. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand.</li>
-    <li><b>3. Event:</b> draw one Event after you Go or Camp (not after a checkpoint camp).</li></ul></details>
+    <li><b>3. Event:</b> draw one Event after you Go or Camp. No Event if you end your turn at a checkpoint.</li>
+    <li><b>Scratched:</b> if your gangline is empty at the end of your turn, you're out of the race. Dogs in your hand don't count.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
     <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed and role bonus. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
     <li>Lead bonus +1 if a Lead dog is at the front, Wheel bonus +1 if a Wheel dog is at the back, with at least 2 dogs that aren't exhausted. Drafting: a trail's Difficulty is 1 less if another musher is on or past it.</li></ul></details>
@@ -3063,7 +3128,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 10:58 PM";
+const LT_BUILD = "Oct 15, 11:20 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
