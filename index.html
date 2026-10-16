@@ -379,6 +379,23 @@ html.phone #app.game .rail .runpanel { border-radius: 14px 14px 0 0; box-shadow:
 html.phone #app.game .logbox { display: none; }
 html.phone.logsheet #app.game .logbox { display: block; position: fixed; left: 8px; right: 8px; bottom: var(--barh, 0px); z-index: 46; max-height: 55dvh; overflow: auto; box-shadow: 0 -6px 24px rgb(0 0 0 / .25); }
 html.phone.logsheet #app.game .logbox .log { max-height: none; }
+
+/* phone fixes: used gear as text, small zoom buttons, one-row bottom bar, slimmer top */
+.usedline { display: none; }
+html.phone #app.game .usedline { display: block; }
+html.phone #app.game .board.gboard .tableau.gline .tz + .tz { display: none; }
+.linkish { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; font: inherit; cursor: pointer; }
+html.phone #app.game .zoomb { width: 18px; height: 18px; min-width: 18px; min-height: 18px; font-size: 10px; left: 2px; top: 2px; opacity: .8; }
+html.phone #app.game .players .pl { display: flex; align-items: center; gap: 5px; padding: 2px 6px; }
+html.phone #app.game .players .pl .nm { flex: none; max-width: 40%; }
+html.phone #app.game .players .pl .chips { margin: 0; flex: 1 1 auto; min-width: 0; }
+html.phone #app.game .players .pl .chips .chip:nth-child(n+3):not(.warn) { display: none; }
+.mobilebar .mbspeed { flex: none; display: flex; flex-direction: column; line-height: 1.1; font-size: 11px; color: var(--muted); min-width: 64px; }
+.mobilebar .mbspeed b { font-family: Bitter, serif; font-size: 18px; color: var(--fg); }
+.mobilebar .mbspeed b.ok { color: var(--good); } .mobilebar .mbspeed b.short { color: var(--bad); }
+.mobilebar .mbdetails { flex: none !important; padding: 11px 10px !important; font-size: 18px !important; line-height: 1; }
+html.phone .mobilebar { flex-wrap: nowrap; }
+html.phone .mobilebar button { padding: 11px 4px; font-size: 14px; }
 .logbtn { display: none; }
 .mobilebar .mbline { flex: 1 1 100%; display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--muted); padding: 0 2px; }
 .mobilebar .mbline b { font-family: Bitter, serif; font-size: 18px; color: var(--fg); }
@@ -2475,7 +2492,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 2:24 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 2:44 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2793,6 +2810,7 @@ function renderGBoard(p, myTurn) {
       <div class="mtext">
         <h2 style="color:${p.color}">${esc(p.name)} <span class="small">· ${esc(p.musher)}</span></h2>
         <div class="small">${esc(g.label(p.pos))}${myTurn ? " · your turn" : ""}${p.lost.length ? ` · dropped: ${p.lost.map(d => esc(d.name)).join(", ")}` : ""}</div>
+        ${p.used.length || p.keptEvents.length ? `<div class="small usedline">${p.used.length ? `Used gear: ${p.used.map(x => esc(x.name)).join(", ")}` : ""}${p.used.length && p.keptEvents.length ? " · " : ""}${p.keptEvents.length ? `Kept: ${p.keptEvents.map(e => `<button class="linkish" data-zoom="event|${esc(e)}">${esc(e)}</button>`).join(", ")}` : ""}</div>` : ""}
         <div class="side ${p.after ? "off" : "on"}"><b>Before Long Rest.</b> ${esc(musherT(p.musher)[0])}</div>
         <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(musherT(p.musher)[1])}</div>
       </div>
@@ -3340,8 +3358,8 @@ function phoneFit() {
   const H = main.clientHeight - 18, Wd = main.clientWidth - 18;
   if (H < 120) return;
   const items = Math.max(1, board.querySelectorAll(".hand .hc").length);
-  const L = g.rules.lineMax || 4;
-  const extraTz = Math.max(0, board.querySelectorAll(".tableau.gline .tz").length - 1);
+  const L = Math.max(1, board.querySelectorAll(".zig .gslot").length);
+  const extraTz = 0;
   const cardH = w => 1.397 * w;
   const zigH = w => 14 + 6 + ((L + 1) / 2) * (cardH(w) + 6) + 14 + extraTz * (cardH(w * .55) + 18);
   const zigW = w => 2 * w + 14 + 14;
@@ -3378,7 +3396,7 @@ function fitCards() {
     const sw = Math.floor(Math.min((W - 40 - 20 - (n - 1) * 8) / n - 4, H * .15 / 1.397, 150));
     root.setProperty("--stripw", Math.max(56, sw) + "px");
   } else if (isNarrow()) {
-    root.setProperty("--stripw", Math.round(Math.max(40, Math.min(64, H * .065, W / 9))) + "px");
+    root.setProperty("--stripw", Math.round(Math.max(38, Math.min(60, H * .055, W / 9))) + "px");
     if (g.format === "gangline") return phoneFit();
   } else return;
   const box = isFit() ? $("#board") : $("#app .main");
@@ -3436,12 +3454,14 @@ function buildMobileBar() {
     const gearSel = [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
     const sp = g.gSpeed(p, gearSel), n = g.gNext(p, gearSel);
     const open = document.documentElement.classList.contains("sheet");
-    html = `<div class="mbline"><span>Speed <b class="${n && n.cost != null ? (n.ok ? "ok" : "short") : ""}">${sp.total}</b></span>${n && n.cost != null ? `<span>${esc(g.label(n.nxt))} <b>${n.cost}</b></span>` : ""}<button class="mbmore" data-act="sheet">${open ? "Close" : "Details"}</button></div>`;
-    if (st.sel) html += `<button class="primary" data-act="ghitch" data-v="front">Hitch front</button><button class="primary" data-act="ghitch" data-v="back">Hitch back</button><button data-act="gsel" data-id="${st.sel}">Cancel</button>`;
+    html = `<div class="mbspeed" title="${n && n.cost != null ? esc(g.label(n.nxt)) : ""}"><span>Speed <b class="${n && n.cost != null ? (n.ok ? "ok" : "short") : ""}">${sp.total}</b></span>${n && n.cost != null ? `<span>next needs <b>${n.cost}</b></span>` : ""}</div>`;
+    const more = `<button class="mbdetails" data-act="sheet" aria-label="${open ? "Close details" : "Turn details"}">${open ? "✕" : "⋯"}</button>`;
+    if (st.sel) html += `<button class="primary" data-act="ghitch" data-v="front">Front</button><button class="primary" data-act="ghitch" data-v="back">Back</button><button data-act="gsel" data-id="${st.sel}">Cancel</button>`;
     else {
       const btns = [...document.querySelectorAll("#runpanel .acts > button.act")].filter(b => ["cpcamp", "longrest", "ggo", "gcamp"].includes(b.dataset.act));
       html += btns.map(b => `<button class="${b.classList.contains("primary") ? "primary" : ""}" data-act="${b.dataset.act}" ${b.disabled ? "disabled" : ""}>${b.querySelector("b").textContent.replace(/^Camp at Checkpoint \d/, "Camp here")}</button>`).join("");
     }
+    html += more;
   } else if (S.run) {
     const need = $(".summary .vs .col:first-child .big"), have = $(".summary .vs .col:nth-child(2) .big"), verdict = $(".summary .verdict");
     const go = $("#runpanel [data-act=go]");
@@ -3628,7 +3648,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 2:24 PM";
+const LT_BUILD = "Oct 16, 2:44 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
