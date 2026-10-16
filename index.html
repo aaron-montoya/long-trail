@@ -520,6 +520,8 @@ const LT = (() => {
         if (li < 2) this.path.push({ id: nid("c"), type: "CP", cp: li + 1 });
       });
       this.path.push({ id: nid("f"), type: "F", cost: FINISH_COST });
+      // Gangline: Trail 1 is always a plain Difficulty 5 trail.
+      if (this.format === "gangline") this.path[0] = { id: nid("t"), type: "T", name: "Snowfield", cost: 5, rtype: null, up: false, reward: null, start: true };
       this.cpIdx = this.path.map((c, i) => c.type === "CP" ? i : -1).filter(i => i >= 0);
 
       this.dogDeck = this.shuffle(DOGS.map(d => ({ id: nid("d"), name: d[0], role: d[1], rs: d[2], ts: d[3], ab: d[4], text: d[5], tt: d[6] || "", state: "rested", hardyUsed: false })));
@@ -558,8 +560,7 @@ const LT = (() => {
         for (let j = 0; j < base + (opts.seatGear ? (opts.seatGear[i] || 0) : i); j++) if (this.gearDeck.length) p.gear.push(this.gearDeck.pop());
       });
       this.players.forEach(p => { if (p.keptStart.length) this.log(`${p.name} starts with kept cards: ${p.keptStart.join(", ")}.`, "good"); });
-      // Gangline: your starting dogs begin hitched up, best Lead in front and a Wheel at the back
-      if (this.format === "gangline") this.players.forEach(p => { p.line = Bot.arrange(p.dogs.map(d => ({ dog: d, st: "rested" }))).map(x => x.dog); });
+      // Gangline: every line starts empty; your starting dogs are in your hand.
     }
 
     shuffle(a) {
@@ -1145,6 +1146,7 @@ const LT = (() => {
     cpGains(cp, long) {
       // "standard" (formerly "lean"): camp = 1 dog + top gear; Long Rest = draw 2 dogs keep 1, draw 2 gear keep 1.
       // "generous" (the old standard): camp = draw 2 dogs + top gear; Long Rest = draw 3 keep 2, draw 2 gear keep 1.
+      if (this.format === "gangline") return [1, 1, 1]; // Gangline: camp or Long Rest = 1 dog and 1 gear
       if (this.mode === "generous") return long ? [3, 2, 2] : [2, 2, 1];
       return long ? [2, 1, 2] : [1, 1, 1];
     }
@@ -1713,7 +1715,7 @@ const artKeys = {
   gear: g => [g.name, "gear " + g.name, ...(ALIAS[g.name] || [])],
   event: e => [e, "event " + e, ...(ALIAS[e] || [])],
   musher: m => [m, "musher " + m, "the " + m],
-  trail: t => [`${t.name} ${t.cost} ${t.rtype || ""}`, `${t.name} ${t.cost} ${t.rtype || "none"}`, `${t.name} ${t.cost} ${t.rtype || "no reward"}`, `${t.name} ${t.cost} ${t.rtype ? "" : "blank"}`],
+  trail: t => t.start ? [] : [`${t.name} ${t.cost} ${t.rtype || ""}`, `${t.name} ${t.cost} ${t.rtype || "none"}`, `${t.name} ${t.cost} ${t.rtype || "no reward"}`, `${t.name} ${t.cost} ${t.rtype ? "" : "blank"}`],
   cp: n => [`checkpoint ${n}`, n === 2 ? "checkpoint 2 long rest" : "checkpoint 1", "checkpoint"],
   finish: () => ["finish"],
   back: kind => [`${kind} back`, `${kind}back`, `back ${kind}`, kind + "s back", "card back", "back"],
@@ -1778,7 +1780,7 @@ function gearCard(g, o = {}) {
   return o.used ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
 }
 const isG = () => !!(S.game && S.game.format === "gangline");
-const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : evText(e)) || "";
+const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : LT.EVENT_TEXT[e]) || "";
 function eventCard(e, o = {}) {
   const url = isG() ? null : artFor(artKeys.event(e));
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(e)}</div><div class="cs">Event</div><div class="cx">${esc(evText(e))}</div>`;
@@ -2056,7 +2058,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 15, 10:48 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 15, 10:54 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2364,7 +2366,7 @@ function gActionsHTML(p, st) {
   h += `<div class="label" style="margin-top:10px">2 · Go or Camp</div><div class="acts">`;
   if (L.atOpenCP) {
     h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, "Every dog rests. Take the top dog and gear. No Event.", { disabled: L.mustLongRest });
-    h += btn("longrest", "Long Rest", "Every dog rests, used gear returns, draw 2 dogs keep 1 and 2 gear keep 1, then skip a turn. No Event.", { primary: L.mustLongRest });
+    h += btn("longrest", "Long Rest", "Every dog rests, used gear returns, take the top dog and gear, then skip a turn. No Event.", { primary: L.mustLongRest });
   }
   let goSub;
   if (noGo) goSub = "Whiteout: you can't Go this turn.";
@@ -2740,11 +2742,11 @@ function zoomHTML(spec) {
       <p class="${b === "1" ? "small" : ""}"><b>Before Long Rest.</b> ${esc(t[0])}</p><p class="${b === "1" ? "" : "small"}"><b>After Long Rest.</b> ${esc(t[1])}</p></div></div>`;
   }
   if (kind === "trail") {
-    const t = { name: a, cost: +b, rtype: c || null, up: true };
+    const t = { name: a, cost: +b, rtype: c || null, up: true, start: +b === 5 };
     return `<div class="zoomview">${trailCard(t, 0, { reveal: true })}<div class="zt"><div class="label">Trail · Difficulty ${b}</div><h3>${esc(a)}</h3><p>${esc(LT.TERRAIN[a] || "No terrain rule.")}</p>
       <p class="small">${c ? (c === "dog" ? "Dog reward: end your Run here to take the dog." : "Gear reward: end your Run here to take the gear.") : "No reward."} Drafting: Difficulty is 1 less if another musher is on or past it${a === "Deep Powder" ? " (3 less here)" : ""}.</p></div></div>`;
   }
-  if (kind === "cp") return `<div class="zoomview">${trailCard({ type: "CP", cp: +a }, 0)}<div class="zt"><div class="label">Checkpoint ${a} · Difficulty 1</div><h3>Checkpoint</h3><p>${esc(LT.CP_TEXT)}</p><p class="small">Every musher takes exactly one Long Rest, at either checkpoint, and must take it before passing Checkpoint 2.</p></div></div>`;
+  if (kind === "cp") return `<div class="zoomview">${trailCard({ type: "CP", cp: +a }, 0)}<div class="zt"><div class="label">Checkpoint ${a} · Difficulty 1</div><h3>Checkpoint</h3><p>${esc(isG() ? "Camp here once: every dog rests, take the top dog and the top gear. Draw no Event. Long Rest: the same, plus all used gear returns, then skip a turn." : LT.CP_TEXT)}</p><p class="small">Every musher takes exactly one Long Rest, at either checkpoint, and must take it before passing Checkpoint 2.</p></div></div>`;
   if (kind === "finish") return `<div class="zoomview">${trailCard({ type: "F" }, 0)}<div class="zt"><div class="label">Difficulty ${LT.FINISH_COST}</div><h3>Finish</h3><p>${esc(LT.FINISH_TEXT)}</p></div></div>`;
   if (kind === "back") return `<div class="zoomview">${backCard("trail")}<div class="zt"><h3>Face-down trail</h3><p>Flips when a musher moves onto the trail before it.</p></div></div>`;
   return "";
@@ -2754,6 +2756,7 @@ function rulesHTML() {
   const g = S.game;
   if ((g ? g.format : S.format) === "gangline") return `<h3>Long Trail · Gangline (prototype)</h3>
   <details class="rules" open><summary>Your turn</summary><ul>
+    <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always Difficulty 5.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules : S.rules).lineMax || 6} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line.</li>
     <li><b>2. Go:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Your Lead dog (the front dog) tires: rested → tired → exhausted. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. Take the reward where you stop.</li>
@@ -2763,7 +2766,8 @@ function rulesHTML() {
     <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed and role bonus. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
     <li>Lead bonus +1 if a Lead dog is at the front, Wheel bonus +1 if a Wheel dog is at the back, with at least 2 dogs that aren't exhausted. Drafting: a trail's Difficulty is 1 less if another musher is on or past it.</li></ul></details>
   <details class="rules"><summary>Checkpoints</summary><ul>
-    <li>Same as Classic: camp once per checkpoint, Long Rest once per race (required before passing Checkpoint 2). Camping at a checkpoint rests every dog.</li></ul></details>
+    <li>Camp once per checkpoint: every dog rests, take the top dog and the top gear. No Event.</li>
+    <li>Long Rest once per race (required before passing Checkpoint 2): every dog rests, used gear returns, take the top dog and the top gear, skip your next turn, then flip your musher. No Event.</li></ul></details>
   <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
   const mode = g ? g.mode : S.mode, rules = g ? g.rules : S.rules, legs = g ? g.legs : S.legs;
   const gen = mode === "generous";
@@ -3027,7 +3031,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 15, 10:48 PM";
+const LT_BUILD = "Oct 15, 10:54 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
