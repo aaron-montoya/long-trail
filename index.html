@@ -958,12 +958,16 @@ const LT = (() => {
       if (p.musher === "Trapper" && !(this.rules.gTrapNoReward && !p.after)) {
         const n0 = p.dogs.length;
         await this.drawDogs(p, 1, 1, "Trapper");
-        // Gangline (After): you may exchange the new dog for a dog on your gangline; that dog goes to your hand
+        // Gangline (After): you may exchange the new dog for a dog on your gangline; that dog is dropped
         const nd = p.dogs.length > n0 ? p.dogs[p.dogs.length - 1] : null;
         if (this.format === "gangline" && p.after && nd && p.line.length) {
           const id = await this.ask(p, { type: "trapSwap", dog: nd.id, options: p.line.map(d => d.id) });
           const old = p.line.find(d => d.id === id);
-          if (old) { nd.state = "rested"; p.line[p.line.indexOf(old)] = nd; old.state = "rested"; this.log(`${p.name} hitches ${nd.name} in place of ${old.name}, who goes back to hand.`, "good"); }
+          if (old) {
+            nd.state = "rested"; p.line[p.line.indexOf(old)] = nd;
+            p.dogs.splice(p.dogs.indexOf(old), 1); old.state = "removed"; p.lost.push(old); this.stats.removed++;
+            this.log(`${p.name} hitches ${nd.name} in place of ${old.name}, who is dropped and heads home.`, "good");
+          }
         }
       }
       if (line.some(x => x.st === "rested" && x.dog.ab === "scavenger")) this.takeGear(p, "Ranger");
@@ -1791,7 +1795,7 @@ const LT = (() => {
         case "pickEvent": return HARSH[req.options[0]] <= HARSH[req.options[1]] ? 0 : 1;
         case "rookieIgnore": return HARSH[req.card] >= 4;
         case "alpineIgnore": return HARSH[req.card] >= 3 || ["Deep Snow", "Long Climb", "Cold Snap", "Steep Climb", "Tangled Lines", "Whiteout"].includes(req.card);
-        case "trapSwap": { const w = p.line.filter(d => d.state !== "rested").sort((a, b) => (a.state === "exh" ? -1 : 0) - (b.state === "exh" ? -1 : 0))[0]; return w ? w.id : ""; }
+        case "trapSwap": { const w = p.line.find(d => d.state === "exh"); return w ? w.id : ""; }
         case "bivyEnd": return p.line.some(d => d.state === "exh") || p.line.filter(d => d.state === "tired").length >= 2;
         case "gContinue": {
           const f = p.line[0];
@@ -2268,7 +2272,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 8:29 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 8:32 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2889,7 +2893,7 @@ function renderModal() {
       const nd = p.dogs.find(d => d.id === r.dog);
       return modal(`<div class="label">${esc(p.name)} · Trapper</div><h3>Exchange ${esc(nd ? nd.name : "the new dog")} for a dog on your gangline?</h3>
         <div class="cards">${nd ? dogCard(nd, { state: "rested", flat: true }) : ""}</div>
-        <p class="small">Tap a dog on your gangline to swap it out. It goes back to your hand. Or keep the new dog in your hand.</p>
+        <p class="small">Tap a dog on your gangline to swap it out. That dog is dropped. Or keep the new dog in your hand.</p>
         <div class="cards">${p.line.map(d => dogCard(d, { pick: true, flat: true, state: d.state, flag: d.state === "exh" ? "exhausted" : d.state, attrs: `data-act="pick" data-v="${d.id}"` })).join("")}</div>
         <div class="btns"><button class="primary" data-act="pick" data-v="">Keep it in hand</button></div>`);
     }
@@ -3279,7 +3283,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 8:29 AM";
+const LT_BUILD = "Oct 16, 8:32 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
