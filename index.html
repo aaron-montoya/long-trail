@@ -466,6 +466,7 @@ const LT = (() => {
       "Desdemona": ["+2 if another musher is ahead of you.", "", 3, 2],
       "Tank": ["Tank won't go on River Ice. Before your team moves onto River Ice, put Tank in your hand.", "Tank won't go on River Ice. Before your team moves onto River Ice, put Tank in your hand."],
       "Bramble": ["After running rested, Bramble is tired.", "", 5, 2],
+      "Cocoa": ["While Cocoa is on your gangline, camping in the open also returns one used gear.", ""],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
       "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
       "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
@@ -1354,6 +1355,7 @@ const LT = (() => {
       const here = p.pos >= 0 ? this.path[p.pos] : null;
       this.log(`${p.name} camps in the open at ${this.label(p.pos)}.`, "act");
       if (p.musher === "Trapper" && p.after && !this.rules.gTrapNoCamp) await this.drawDogs(p, 1, 1, "Trapper");
+      const cocoaOnLine = p.line.some(d => d.ab === "cocoa"); // Cocoa works from the gangline in this format
       for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
       let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
       if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
@@ -1370,7 +1372,7 @@ const LT = (() => {
         const next = [...ord, ...rest];
         if (next.some((d, i) => d !== p.line[i])) { p.line = next; this.log(`${p.name} rearranges the gangline.`, ""); }
       }
-      const cocoa = this.gHand(p).some(d => d.ab === "cocoa");
+      const cocoa = cocoaOnLine;
       if (cocoa && p.used.length) {
         const id = await this.ask(p, { type: "tinker", options: p.used.map(g => g.id), source: "Cocoa" });
         const g = p.used.find(x => x.id === id) || p.used[0];
@@ -1406,15 +1408,15 @@ const LT = (() => {
         return true;
       };
       switch (e) {
-        case "Deep Snow": { const f = line[0]; if (f && f.state === "rested") { f.state = "tired"; this.log(`${f.name} tires in the deep snow.`, "bad"); } break; }
+        case "Deep Snow": if (this.rules.gEvV2 || this.rules.gEvDeep1) { const fs = line.filter(d => d.state !== "exh").slice(0, this.rules.gEvDeep1 ? 1 : 2); for (const d of fs) await this.gTireDog(p, d, e); break; } else { const f = line[0]; if (f && f.state === "rested") { f.state = "tired"; this.log(`${f.name} tires in the deep snow.`, "bad"); } break; }
         case "Long Climb": { const t = line.filter(d => d.role === "Team" && d.state === "rested"); t.forEach(d => d.state = "tired"); if (t.length) this.log(`${t.map(d => d.name).join(", ")} tire${t.length === 1 ? "s" : ""} on the climb.`, "bad"); break; }
-        case "Cold Snap": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
+        case "Cold Snap": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } else if (this.rules.gEvV2 || this.rules.gEvCold2) { const r = await pickLine(d => d.state === "rested", "No tired dogs: choose a rested dog to tire."); if (r) { r.state = "tired"; this.log(`${r.name} tires (${e}).`, "bad"); } } break; }
         case "Steep Climb": line.filter(d => d.state === "tired").forEach(d => d.state = "exh"); break;
         case "Tangled Lines": if (line.length > 1) { const f = line.shift(); line.push(f); this.log(`${f.name} ends up at the back of the line.`, "bad"); } break;
         case "Bitter Cold": if (!(await dropExh(this.rules.gColdTired))) { const d = await pickLine(d => d.state === "tired", "No exhausted dogs: choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } } break;
         case "Blizzard": await dropExh(this.rules.gBlizTired); if (!p.scratched) this.moveBack(p); break;
         case "Whiteout": p.noGo = true; this.log(`${p.name} can't Run next turn.`, "bad"); break;
-        case "Second Wind": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to rest."); if (d) { d.state = "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
+        case "Second Wind": { const d = await pickLine(d => d.state === "tired" || ((this.rules.gEvV2 || this.rules.gEvWind2) && d.state === "exh"), "Choose a dog to recover one step."); if (d) { d.state = d.state === "exh" ? "tired" : "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
         case "Tailwind": p.runBonus += 2; p.keptEvents.push(e); break;
         default: break;
       }
@@ -2203,7 +2205,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 7:31 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 7:41 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3199,7 +3201,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 7:31 AM";
+const LT_BUILD = "Oct 16, 7:41 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
