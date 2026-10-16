@@ -461,7 +461,11 @@ const LT = (() => {
   // The game shows these as text cards (no art) with this wording instead.
   const G_ALT = {
     dog: {
-      "Chappell": ["", "If Chappell is tired and would become exhausted, he returns to your hand instead, unless he's your only hitched dog."],
+      "Chappell": ["", "If Chappell is tired and would become exhausted, she returns to your hand instead, unless she's your only hitched dog."],
+      // [rested text, tired text, rested Speed, tired Speed]
+      "Desdemona": ["+2 if another musher is ahead of you.", "", 3, 2],
+      "Tank": ["Tank won't go on River Ice. Before your team moves onto River Ice, put Tank in your hand.", "Tank won't go on River Ice. Before your team moves onto River Ice, put Tank in your hand."],
+      "Bramble": ["After running rested, Bramble is exhausted.", ""],
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
       "Anvil": ["+2 if 4 or more dogs in your line aren't exhausted.", ""],
       "Boulder": ["While Boulder is rested, in your hand or your line, Events can't move you back a trail.", ""],
@@ -526,6 +530,8 @@ const LT = (() => {
         if (this.rules.gTire2 === undefined) this.rules.gTire2 = true; // the front 2 dogs tire each step
         // a spent team on a trail is scratched (checkpoints are safe)
         if (this.rules.gScratchExh === undefined) { this.rules.gScratchExh = "line"; this.rules.gScratchNoCP = true; }
+        if (this.rules.gTankAuto === undefined) this.rules.gTankAuto = true; // Tank steps off the line before River Ice
+        if (this.rules.gBrambleRested === undefined) this.rules.gBrambleRested = true; // after running rested, Bramble is exhausted
       }
       this.r = rng(this.seed);
       this.round = 0;
@@ -555,7 +561,7 @@ const LT = (() => {
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
       if (this.format === "gangline") {
         this.gearDeck = this.gearDeck.filter(g => !G_ALT.noGear.includes(g.name));
-        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; d.gAlt = true; } }
+        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; if (a[2] != null) d.rs = a[2]; if (a[3] != null) d.ts = a[3]; d.gAlt = true; } }
         for (const g of this.gearDeck) { const a = G_ALT.gear[g.name]; if (a) { g.text = a; g.gAlt = true; } }
       }
       this.eventDeck = this.shuffle((this.format === "gangline" ? G_EVENTS : EVENTS).flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
@@ -1233,6 +1239,8 @@ const LT = (() => {
       const i = st.findIndex(s => s !== "exh");
       if (i >= 0) st[i] = this.rules.gExhStep ? "exh" : t(st[i]);
       if (this.rules.gTire2) { const j = st.findIndex((s, k) => s !== "exh" && k !== i); if (j >= 0) st[j] = t(st[j]); }
+      // Bramble: after running rested he's exhausted, so count him as spent
+      if (this.rules.gBrambleRested && !this.rules.gBrambleTired) p.line.forEach((d, k) => { if (d.ab === "bramble" && d.state === "rested") st[k] = "exh"; });
       return st.length > 0 && st.every(s => s === "exh");
     }
     gTire(d) {
@@ -1290,7 +1298,7 @@ const LT = (() => {
           const go = await this.ask(p, { type: "gContinue", speed: n.speed, cost: n.cost, next: n.nxt, label: this.label(n.nxt) });
           if (!go) break;
         }
-        if (n.tankOff) { for (const d of p.line.filter(d => d.ab === "heavy")) p.line.splice(p.line.indexOf(d), 1); this.log(`Tank won't cross River Ice and goes back to ${p.name}'s hand.`, ""); }
+        if (n.tankOff) { for (const d of p.line.filter(d => d.ab === "heavy")) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; } this.log(`Tank won't go on River Ice and goes back to ${p.name}'s hand.`, ""); }
         p.pos = n.nxt; moved++;
         this.onMoveOnto(n.nxt);
         if (n.c.type === "F") {
@@ -1322,7 +1330,8 @@ const LT = (() => {
       }
       // Tailwind cards kept before this Go are used up; one drawn while pressing on waits for your next Go
       p.runBonus -= bonus0; p.keptEvents = p.keptEvents.slice(kept0); p.costMod = 0; p.campedLast = false;
-      if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
+      if (this.rules.gBrambleRested) { if (moved) for (const x of line0) if (x.st === "rested" && x.dog.ab === "bramble" && p.line.includes(x.dog) && x.dog.state !== "exh") { x.dog.state = this.rules.gBrambleTired ? "tired" : "exh"; this.log(`Bramble ran rested and is ${x.dog.state === "exh" ? "exhausted" : "tired"}.`, ""); } }
+      else if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
         const opts = p.used.map(g => g.id);
         const id = await this.ask(p, { type: "tinker", options: opts });
@@ -1688,7 +1697,7 @@ const LT = (() => {
       const bivy = !!p.gear.find(x => x.name === "Bivy Sack");
       if (noGo) return { type: "camp", bivy };
       // Bramble is dropped if he runs tired: camp first
-      if (p.line.some(d => d.ab === "bramble" && d.state === "tired") && !noGo) return { type: "camp", bivy };
+      if (!g.rules.gBrambleRested && p.line.some(d => d.ab === "bramble" && d.state === "tired") && !noGo) return { type: "camp", bivy };
       // Tank blocks River Ice: camp and send him back to hand
       const nb = g.gNext(p, []);
       if (nb && nb.blocked) { const tank = p.line.find(d => d.ab === "heavy" && d.state !== "exh"); if (tank && p.line.length > 1) return { type: "camp", bivy, ret: [tank.id] }; }
@@ -2182,7 +2191,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 6:59 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 7:20 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2498,7 +2507,7 @@ function gActionsHTML(p, st) {
   let goSub;
   if (noGo) goSub = "Whiteout: you can't Run this turn.";
   else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
-  else if (n.blocked) goSub = "Tank won't step onto River Ice. Camp and send Tank back to your hand first.";
+  else if (n.blocked) goSub = "Tank won't go on River Ice, and he's your only hitched dog.";
   else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
   else goSub = `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire. Every trail after the first draws an Event.`;
   h += btn("ggo", "Run", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
@@ -2850,7 +2859,7 @@ function zoomHTML(spec) {
   if (kind === "dog") {
     const r = LT.DOGS.find(x => x[0] === a); if (!r) return "";
     const ga = gAlt("dog", r[0]);
-    const d = { name: r[0], role: r[1], rs: r[2], ts: r[3], ab: r[4], text: ga ? ga[0] : r[5], tt: ga ? ga[1] : (r[6] || "") };
+    const d = { name: r[0], role: r[1], rs: ga && ga[2] != null ? ga[2] : r[2], ts: ga && ga[3] != null ? ga[3] : r[3], ab: r[4], text: ga ? ga[0] : r[5], tt: ga ? ga[1] : (r[6] || "") };
     return `<div class="zoomview">${dogCard(d, { state: "rested", flat: true })}<div class="zt"><div class="label">${d.role} dog${b && b !== "rested" ? " · " + (b === "exh" ? "exhausted" : b) : ""}</div><h3>${esc(d.name)}</h3>
       <p>Rested Speed <b>${d.rs}</b> · Tired Speed <b>${d.ts}</b></p>${d.text ? `<p><b>Rested:</b> ${esc(d.text)}</p>` : ""}${d.tt ? `<p><b>Tired:</b> ${esc(d.tt)}</p>` : ""}${!d.text && !d.tt ? `<p class="small">No ability.</p>` : ""}
       <p class="small">${d.role === "Lead" ? "Lead: +1 Speed when it runs first with at least one dog behind it, rested or tired." : d.role === "Wheel" ? "Wheel: +1 Speed when it runs last with at least one dog ahead of it, rested or tired." : "Team: no position bonus."} Abilities only work while the dog is rested, unless they're printed on the tired half too.</p></div></div>`;
@@ -3166,7 +3175,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 6:59 AM";
+const LT_BUILD = "Oct 16, 7:20 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
