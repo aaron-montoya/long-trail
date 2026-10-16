@@ -680,7 +680,7 @@ const LT = (() => {
         if (d.ab === "echo" && !line.some(y => y.st === "tired")) v += 2;
         if (d.ab === "packer") v += runN - 1;
         if (d.ab === "anvil" && runN >= 4) v += 2;
-        if (d.ab === "underdog" && this.players.some(q => q !== p && !q.scratched && q.pos > p.pos)) v += 2;
+        if (d.ab === "underdog" && this.players.some(q => q !== p && !q.scratched && q.pos > p.pos)) v += this.rules.gUnderdog || 2;
         if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
         if (d.ab === "aurora" && p.pos >= 0 && this.finalLeg(p.pos)) v += 2;
         add(v, d.name);
@@ -858,7 +858,7 @@ const LT = (() => {
     }
     moveBack(p) {
       if (p.pos < 0) return;
-      const anchor = p.dogs.find(d => d.ab === "anchor" && d.state === "rested");
+      const anchor = (this.rules.gLineOnly && this.format === "gangline" ? p.line : p.dogs).find(d => d.ab === "anchor" && d.state === "rested");
       if (anchor) { this.log(`${anchor.name} digs in. ${p.name} doesn't move back.`, "good"); return; }
       if (p.pos === 0) { p.pos = -1; this.log(`${p.name} is pushed back to the start.`, "bad"); return; }
       if (this.path[p.pos].type === "CP" || this.path[p.pos - 1].type === "CP") return;
@@ -1134,7 +1134,7 @@ const LT = (() => {
       await this.event(p, "slogging");
     }
 
-    shadowSafe(p) { return p.shadowTurn || p.dogs.some(d => d.ab === "shadow" && d.state === "rested"); }
+    shadowSafe(p) { return p.shadowTurn || (this.rules.gLineOnly && this.format === "gangline" ? p.line : p.dogs).some(d => d.ab === "shadow" && d.state === "rested"); }
     refreshDogs(p) { p.dogs.forEach(d => { if (d.state !== "rested") d.state = "rested"; }); }
 
     async doCampOpen(p, action) {
@@ -1218,7 +1218,8 @@ const LT = (() => {
       if (p.pos >= 0 && this.path[p.pos].type === "CP" && !this.canPassCP(p, p.pos)) return null;
       const c = this.path[nxt];
       const line = this.gLine(p);
-      const tank = line.some(x => x.dog.ab === "heavy" && x.st !== "exh");
+      let tank = line.some(x => x.dog.ab === "heavy" && x.st !== "exh");
+      if (tank && this.rules.gTankAuto && c.type === "T" && c.up && c.name === "River Ice") { const l2 = line.filter(x => x.dog.ab !== "heavy"); if (l2.length) { const sp2 = this.speedOf(p, l2, gearSel).total, cost2 = this.trailCost(p, nxt, l2, gearSel); return { nxt, c, speed: sp2, cost: cost2, ok: sp2 >= cost2, tankOff: true }; } }
       const sp = this.speedOf(p, line, gearSel).total;
       if (c.type === "T" && !c.up) return { nxt, c, speed: sp, cost: null, ok: false, hidden: true };
       const cost = this.trailCost(p, nxt, line, gearSel);
@@ -1273,7 +1274,7 @@ const LT = (() => {
       for (const g of gearSel) { p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g); }
       const booties = gearSel.some(g => g.name === "Booties");
       const line0 = this.gLine(p);
-      if (line0.some(x => x.dog.ab === "ignore1" && (x.st === "rested" || (x.st !== "exh" && x.dog.tt)))) p.ignoreLeft = 1;
+      if ((this.rules.gAlpineFront ? line0.slice(0, 1) : line0).some(x => x.dog.ab === "ignore1" && (x.st === "rested" || (x.st !== "exh" && x.dog.tt)))) p.ignoreLeft = 1;
       p.shadowTurn = line0.some(x => x.st === "rested" && x.dog.ab === "shadow");
       if (this.rules.gTireAll) for (const d of p.line.slice(1)) this.gTire(d);
       const start = p.pos;
@@ -1289,6 +1290,7 @@ const LT = (() => {
           const go = await this.ask(p, { type: "gContinue", speed: n.speed, cost: n.cost, next: n.nxt, label: this.label(n.nxt) });
           if (!go) break;
         }
+        if (n.tankOff) { for (const d of p.line.filter(d => d.ab === "heavy")) p.line.splice(p.line.indexOf(d), 1); this.log(`Tank won't cross River Ice and goes back to ${p.name}'s hand.`, ""); }
         p.pos = n.nxt; moved++;
         this.onMoveOnto(n.nxt);
         if (n.c.type === "F") {
@@ -1320,7 +1322,7 @@ const LT = (() => {
       }
       // Tailwind cards kept before this Go are used up; one drawn while pressing on waits for your next Go
       p.runBonus -= bonus0; p.keptEvents = p.keptEvents.slice(kept0); p.costMod = 0; p.campedLast = false;
-      for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
+      if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
         const opts = p.used.map(g => g.id);
         const id = await this.ask(p, { type: "tinker", options: opts });
@@ -1436,6 +1438,7 @@ const LT = (() => {
     }
     // Optional rule: a team with no dog left that isn't exhausted can't go on.
     async gSpentCheck(p) {
+      if (this.rules.gBrambleExh) for (const d of p.line.filter(d => d.ab === "bramble" && d.state === "exh")) await this.dropDog(p, d, "Bramble is spent");
       if (!this.rules.gEmptyOk && !p.scratched && !this.over && !p.line.length) {
         p.scratched = true; p.scratchPos = p.pos; p.scratchRound = this.round;
         this.log(`${p.name}'s gangline is empty. ${p.name} is scratched.`, "bad");
@@ -1665,8 +1668,11 @@ const LT = (() => {
         return { type: "cp", long: false };
       }
       const hand = g.gHand(p);
-      if (g.gCanHitch(p)) {
-        const d = hand.slice().sort((a, b) => dogVal(b) - dogVal(a))[0];
+      // don't hitch Tank while River Ice is ahead on this leg
+      const iceAhead = (() => { for (let i = p.pos + 1; i < g.path.length && g.path[i].type === "T"; i++) if (g.path[i].up && g.path[i].name === "River Ice") return true; return false; })();
+      const pool = hand.filter(d => !(d.ab === "heavy" && iceAhead));
+      if (g.gCanHitch(p) && (pool.length || !p.line.length)) {
+        const d = (pool.length ? pool : hand).slice().sort((a, b) => dogVal(b) - dogVal(a))[0];
         const f = p.line[0];
         const end = d.role === "Lead" && (!f || f.role !== "Lead" || f.state !== "rested") ? "front" : (!f || f.state === "exh") && d.role !== "Wheel" ? "front" : "back";
         return { type: "hitch", id: d.id, end };
@@ -1681,6 +1687,8 @@ const LT = (() => {
       }
       const bivy = !!p.gear.find(x => x.name === "Bivy Sack");
       if (noGo) return { type: "camp", bivy };
+      // Bramble is dropped if he runs tired: camp first
+      if (p.line.some(d => d.ab === "bramble" && d.state === "tired") && !noGo) return { type: "camp", bivy };
       // Tank blocks River Ice: camp and send him back to hand
       const nb = g.gNext(p, []);
       if (nb && nb.blocked) { const tank = p.line.find(d => d.ab === "heavy" && d.state !== "exh"); if (tank && p.line.length > 1) return { type: "camp", bivy, ret: [tank.id] }; }
@@ -2174,7 +2182,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 6:53 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 6:59 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3158,7 +3166,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 6:53 AM";
+const LT_BUILD = "Oct 16, 6:59 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
