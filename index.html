@@ -2073,7 +2073,7 @@ function backCard(kind, o = {}) {
 }
 function trailCard(c, i, o = {}) {
   if (c.type === "CP") {
-    const url = isG() ? (cpDogsN() === G_PRINTED.cpDogs ? gArt(artKeys.cp(c.cp)) : null) : artFor(artKeys.cp(c.cp)); // printed Gangline checkpoint text
+    const url = isG() ? gArt(artKeys.cp(c.cp)) : artFor(artKeys.cp(c.cp)); // Gangline: always use the Checkpoint card image
     return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Difficulty 1</div><div class="cx">${esc(isG() ? gCpText() : LT.CP_TEXT)}</div>`}</div>`;
   }
   if (c.type === "F") {
@@ -2335,7 +2335,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 12:57 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 1:00 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3389,7 +3389,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 12:57 PM";
+const LT_BUILD = "Oct 16, 1:00 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
