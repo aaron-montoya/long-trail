@@ -318,41 +318,76 @@ html.fit #app.game .board.gboard .mtext { max-width: 52ch; text-align: left; }
 html.fit #app.game .board.gboard .mtext .side { display: block; padding: 3px 6px; font-size: 12.5px; }
 html.fit #app.game .board.gboard .handzone { grid-column: 2; grid-row: 2; }
 html.fit #app.game .board.gboard .hand { flex-wrap: wrap; overflow: visible; }
-/* Phone: the whole race on one portrait screen; the turn panel and log scroll inside */
-html.phone #app.game { height: 100vh; height: 100dvh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; gap: 6px; padding-block: 6px; }
-html.phone body.hasbar #app.game { height: calc(100dvh - 76px - env(safe-area-inset-bottom, 0px)); }
+/* Phone / foldable: the whole race locked to the screen. Nothing scrolls the page. */
+html.phone body { margin: 0; }
 html.phone body.hasbar { padding-bottom: 0; }
-html.phone #app.game > * { flex: none; margin: 0; }
-html.phone #app.game .main { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-html.phone #app.game .rail { position: static; }
-html.phone #app.game .board .musherrow { align-items: center; }
-html.phone #app.game .board .musherrow > .card { --w: 46px; }
-html.phone #app.game .board .mtext h2 { font-size: 15px; }
-html.phone #app.game .board .mtext .side { display: none; }
-html.phone #app.game .tableau { margin-top: 6px; }
-html.phone #app.game .handzone { margin-top: 6px; }
-html.phone #app.game .players { margin: 0; }
-html.phone #app.game .players .pl { padding: 4px 8px; }
-html.phone #app.game .logbox { padding: 6px 10px; }
-html.phone #app.game .top { flex-wrap: nowrap; }
-html.phone #app.game .top .meta { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; order: 0; flex: 1 1 auto; min-width: 0; scrollbar-width: none; }
+html.phone #app.game { height: calc(100dvh - var(--barh, 0px)); box-sizing: border-box; overflow: hidden; display: grid; gap: 6px;
+  grid-template-rows: auto auto auto minmax(0, 1fr); padding-block: 6px; }
+html.phone #app.game > #modal { display: contents; }
+html.phone #app.game > * { margin: 0; min-width: 0; }
+html.phone #app.game .top { flex-wrap: nowrap; gap: 6px; }
 html.phone #app.game .top h1 { display: none; }
+html.phone #app.game .top .meta { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; order: 0; flex: 1 1 auto; min-width: 0; scrollbar-width: none; font-size: 12.5px; }
+html.phone #app.game .top .meta .deckc { display: none; }
 html.phone #app.game .top .tools { flex: none; flex-wrap: nowrap; }
+html.phone #app.game .top .tools button { padding: 5px 9px; }
 html.phone #app.game .top.showtools { flex-wrap: wrap; }
 html.phone #app.game .top.showtools .tools { flex: 1 1 100%; flex-wrap: wrap; }
-html.fit body, html.phone body { margin: 0; }
-html.phone #app.game .players .pl { width: min(60vw, 220px); }
-html.phone #app.game .players .pl .nm .small { display: none; }
-html.phone #app.game .players .pl .chips { flex-wrap: nowrap; overflow: hidden; }
-html.phone #app.game .stripbox { padding: 4px 6px; }
-html.phone #app.game .tokens { height: 18px; }
-html.phone #app.game .logbox[open] .log { max-height: 22vh; }
+html.phone #app.game .logbtn { display: inline-block; }
+html.phone #app.game .stripbox { padding: 2px 6px 4px; }
+html.phone #app.game .tokens { height: 16px; }
+html.phone #app.game .tok { width: 16px; height: 16px; font-size: 9px; border-width: 1px; }
+html.phone #app.game .slotlab { font-size: 9.5px; }
 html.phone #app.game .slot { position: relative; }
-html.phone #app.game .slot .rewmini { position: absolute; z-index: 3; --w: calc(var(--stripw) * .5); left: 55%; top: calc(24px + var(--stripw) * .62); transform: rotate(5deg); box-shadow: 0 2px 6px rgb(0 0 0 / .35); }
-html.phone #app.game .startcard { width: calc(var(--stripw) * .6); height: calc(var(--stripw) * 1.397); }
+html.phone #app.game .slot .rewmini { position: absolute; z-index: 3; --w: calc(var(--stripw) * .5); left: 55%; top: calc(16px + var(--stripw) * .62); transform: rotate(5deg); box-shadow: 0 2px 6px rgb(0 0 0 / .35); }
+html.phone #app.game .startcard { width: calc(var(--stripw) * .6); height: calc(var(--stripw) * 1.397); font-size: 11px; }
+html.phone #app.game .players { display: flex; gap: 4px; overflow: hidden; }
+html.phone #app.game .players .pl { flex: 1 1 0; width: auto; min-width: 0; padding: 3px 6px; border-left-width: 4px; }
+html.phone #app.game .players .pl .nm b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+html.phone #app.game .lg-long { display: none; }
+.lg-short { display: none; }
+html.phone #app.game .lg-short { display: inline; }
+html.phone #app.game .players .pl .nm b { font-size: 13px; }
+html.phone #app.game .players .pl .nm .small, html.phone #app.game .players .pl .last { display: none; }
+html.phone #app.game .players .pl .chips { flex-wrap: nowrap; overflow: hidden; margin-top: 1px; }
+html.phone #app.game .players .chip { font-size: 10.5px; padding: 0 5px; }
+html.phone #app.game .main { display: block; min-height: 0; overflow: hidden; }
+html.phone #app.game .board { height: 100%; box-sizing: border-box; overflow: auto; padding: 8px; }
+/* Gangline board: staggered team on the left, musher top right, hand beside (A) or below (B) */
+html.phone #app.game .board.gboard { display: grid; gap: 6px 10px; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); align-content: start; overflow: hidden; }
+html.phone #app.game .board.gboard .tableau.gline { grid-column: 1; grid-row: 1 / span 2; margin: 0; padding: 6px; align-items: flex-start; flex-wrap: nowrap; }
+html.phone #app.game .board.gboard .tableau.gline .tz { align-items: flex-start; }
+html.phone #app.game .board.gboard .tableau.gline .label { max-width: calc(var(--handw) * 2 + 14px); font-size: 10px; }
+html.phone #app.game .board.gboard .tableau .tz + .tz .card { --w: calc(var(--handw) * .55); }
+html.phone #app.game .board.gboard .musherrow { grid-column: 2; grid-row: 1; flex-direction: row; align-items: flex-start; gap: 8px; }
+html.phone #app.game .board.gboard .musherrow > .card { --w: calc(var(--handw) * .5); }
+html.phone #app.game .board.gboard .mtext h2 { font-size: 14px; }
+html.phone #app.game .board.gboard .mtext .small { font-size: 11.5px; }
+html.phone #app.game .board.gboard .mtext .side { display: none; }
+html.phone #app.game .board.gboard .handzone { grid-column: 2; grid-row: 2; margin: 0; min-height: 0; display: flex; flex-direction: column; }
+html.phone #app.game .board.gboard .handzone > .label { font-size: 10px; }
+html.phone #app.game .board.gboard .hand { display: grid; grid-template-columns: repeat(auto-fill, var(--handw)); gap: 6px; padding: 2px 0; overflow: hidden; align-content: start; flex-wrap: wrap; }
+html.phone #app.game .board.gboard .hc.gap { margin-left: 0; }
+html.phone #app.game .board.gboard.layB { grid-template-rows: auto auto; }
+html.phone #app.game .board.gboard.layB .tableau.gline { grid-row: 1; }
+html.phone #app.game .board.gboard.layB .handzone { grid-column: 1 / -1; grid-row: 2; }
+/* Turn details and the race log open as sheets over the board */
+html.phone #app.game .rail { position: fixed; top: auto; left: 0; right: 0; bottom: var(--barh, 0px); z-index: 45; max-height: 62dvh; overflow: auto; display: none;
+  padding: 0 max(8px, env(safe-area-inset-right, 0px)) 8px max(8px, env(safe-area-inset-left, 0px)); }
+html.phone.sheet #app.game .rail { display: block; }
+html.phone #app.game .rail .runpanel { border-radius: 14px 14px 0 0; box-shadow: 0 -6px 24px rgb(0 0 0 / .25); }
+html.phone #app.game .logbox { display: none; }
+html.phone.logsheet #app.game .logbox { display: block; position: fixed; left: 8px; right: 8px; bottom: var(--barh, 0px); z-index: 46; max-height: 55dvh; overflow: auto; box-shadow: 0 -6px 24px rgb(0 0 0 / .25); }
+html.phone.logsheet #app.game .logbox .log { max-height: none; }
+.logbtn { display: none; }
+.mobilebar .mbline { flex: 1 1 100%; display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--muted); padding: 0 2px; }
+.mobilebar .mbline b { font-family: Bitter, serif; font-size: 18px; color: var(--fg); }
+.mobilebar .mbline b.ok { color: var(--good); } .mobilebar .mbline b.short { color: var(--bad); }
+.mobilebar .mbline .mbmore { margin-left: auto; flex: none; padding: 3px 10px; font-size: 13px; font-weight: 600; }
 .mobilebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 6px; align-items: center;
   padding: 8px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
   background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 14px rgba(0,0,0,.18); }
+.mobilebar { flex-wrap: wrap; }
 .mobilebar button { flex: 1 1 0; padding: 11px 6px; font-weight: 700; font-size: 15px; }
 .mobilebar .mbsum { flex: 2 1 0; display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
 .mobilebar .mbsum b { font-family: Bitter, serif; font-size: 20px; color: var(--fg); }
@@ -2440,7 +2475,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 2:10 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 16, 2:24 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2580,6 +2615,7 @@ function renderGame(full) {
         <div class="tools">
           <span class="clock" title="Race time (paused time doesn't count)">⏱ <b id="clock">0:00</b></span>
           <button id="pausebtn" data-act="pause">Pause</button>
+          <button class="logbtn" data-act="logsheet" aria-label="Race log">Log</button>
           <button class="menubtn" data-act="menu" aria-label="More options">☰</button>
           <select class="opt" id="botspeed2" aria-label="Bot speed">${[[1400, "Bots: slow"], [700, "Bots: normal"], [250, "Bots: fast"], [0, "Bots: instant"]].map(([v, l]) => `<option value="${v}" ${S.botSpeed == v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <span class="seg sizer opt" role="group" aria-label="Card size">${["S", "M", "L"].map(v => `<button data-act="size" data-v="${v}" class="${(S.cardSize || "M") === v ? "on" : ""}" title="Card size ${v}">${v}</button>`).join("")}</span>
@@ -2761,9 +2797,9 @@ function renderGBoard(p, myTurn) {
         <div class="side ${p.after ? "on" : "off"}"><b>After Long Rest.</b> ${esc(musherT(p.musher)[1])}</div>
       </div>
     </div>
-    <div class="tableau gline" aria-label="Your gangline"><div class="tz"><div class="label">Your gangline · front to back · Speed ${g.gSpeed(p, [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean)).total}</div>${lineHTML ? `<div class="zig" style="--gn:${gn}">${lineHTML}</div>` : `<div class="row"><span class="empty">No dogs hitched.</span></div>`}</div>${tz.join("")}</div>
+    <div class="tableau gline" aria-label="Your gangline"><div class="tz"><div class="label"><span class="lg-long">Your gangline · front to back</span><span class="lg-short">Gangline</span> · Speed ${g.gSpeed(p, [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean)).total}</div>${lineHTML ? `<div class="zig" style="--gn:${gn}">${lineHTML}</div>` : `<div class="row"><span class="empty">No dogs hitched.</span></div>`}</div>${tz.join("")}</div>
     <div class="handzone">
-      <div class="label">Your hand · ${hand.length} dog${hand.length === 1 ? "" : "s"}, ${p.gear.length} gear${canHitch ? " · tap a dog to hitch it" : ""}</div>
+      <div class="label">Your hand · ${hand.length} dog${hand.length === 1 ? "" : "s"}, ${p.gear.length} gear${canHitch ? `<span class="lg-long"> · tap a dog to hitch it</span>` : ""}</div>
       <div class="hand" id="hand">${items.join("") || `<span class="empty">Your hand is empty.</span>`}</div>
     </div>`;
   if (!myTurn) rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`;
@@ -3297,6 +3333,39 @@ function placeLog() {
   if (isFit()) { if (log.parentElement !== rail) rail.appendChild(log); }
   else if (log.parentElement === rail) main.after(log);
 }
+// Phone / foldable: pick the card size and arrangement (hand beside or below the team) that fits the screen
+function phoneFit() {
+  const g = S.game, main = $("#app .main"), board = $("#board"), root = document.documentElement.style;
+  if (!main || !board) return;
+  const H = main.clientHeight - 18, Wd = main.clientWidth - 18;
+  if (H < 120) return;
+  const items = Math.max(1, board.querySelectorAll(".hand .hc").length);
+  const L = g.rules.lineMax || 4;
+  const extraTz = Math.max(0, board.querySelectorAll(".tableau.gline .tz").length - 1);
+  const cardH = w => 1.397 * w;
+  const zigH = w => 14 + 6 + ((L + 1) / 2) * (cardH(w) + 6) + 14 + extraTz * (cardH(w * .55) + 18);
+  const zigW = w => 2 * w + 14 + 14;
+  const musherH = w => Math.max(cardH(w * .5), 44);
+  const handH = (w, width) => { const cols = Math.floor((width + 6) / (w + 6)); return cols < 1 ? Infinity : 16 + Math.ceil(items / cols) * (cardH(w) + 6); };
+  let pick = null;
+  for (let w = 190; w >= 48; w -= 2) {
+    const a = zigH(w) <= H && musherH(w) + 6 + handH(w, Wd - zigW(w) - 10) <= H;
+    const b = Math.max(zigH(w), musherH(w)) + 6 + handH(w, Wd) <= H;
+    if (a || b) { pick = { w, lay: a ? "A" : "B" }; break; }
+  }
+  if (!pick) pick = { w: 48, lay: "B" };
+  root.setProperty("--handw", pick.w + "px");
+  board.classList.toggle("layB", pick.lay === "B");
+  const hand = board.querySelector(".hand");
+  const fits = () => board.scrollHeight <= board.clientHeight + 1 && board.scrollWidth <= board.clientWidth + 1 && (!hand || hand.scrollHeight <= hand.clientHeight + 1);
+  let w = pick.w;
+  for (let i = 0; i < 40 && w < 200; i++) {
+    root.setProperty("--handw", (w + 2) + "px");
+    if (!fits()) { root.setProperty("--handw", w + "px"); break; }
+    w += 2;
+  }
+  while (!fits() && w > 44) { w -= 2; root.setProperty("--handw", w + "px"); }
+}
 // Size the cards so the trail, your gangline and your hand all fit on one screen.
 function fitCards() {
   const root = document.documentElement.style, g = S.game;
@@ -3309,7 +3378,8 @@ function fitCards() {
     const sw = Math.floor(Math.min((W - 40 - 20 - (n - 1) * 8) / n - 4, H * .15 / 1.397, 150));
     root.setProperty("--stripw", Math.max(56, sw) + "px");
   } else if (isNarrow()) {
-    root.setProperty("--stripw", Math.round(Math.max(50, Math.min(76, H * .085))) + "px");
+    root.setProperty("--stripw", Math.round(Math.max(40, Math.min(64, H * .065, W / 9))) + "px");
+    if (g.format === "gangline") return phoneFit();
   } else return;
   const box = isFit() ? $("#board") : $("#app .main");
   const board = $("#board");
@@ -3329,7 +3399,7 @@ function wantPhone() {
   const pref = S.layout || "auto";
   if (pref === "phone") return true;
   if (pref === "desktop") return false;
-  if (window.matchMedia("(max-width: 700px)").matches) return true;
+  if (window.matchMedia("(max-width: 999px)").matches) return true;
   const touch = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches || (navigator.maxTouchPoints || 0) > 0;
   const mobileUA = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
   const w = Math.min(window.innerWidth || 9999, (window.screen && window.screen.width) || 9999);
@@ -3358,9 +3428,21 @@ function scrollStripToAction() {
 function buildMobileBar() {
   const bar = $("#mobilebar"); if (!bar) return;
   const pd = S.pending, myTurn = pd && pd.req.type === "action" && !pd.p.bot;
-  if (!isNarrow() || !myTurn) { bar.hidden = true; document.body.classList.remove("hasbar"); return; }
+  const setBarH = () => document.documentElement.style.setProperty("--barh", (bar.hidden ? 0 : bar.offsetHeight) + "px");
+  if (!isNarrow() || !myTurn) { bar.hidden = true; document.body.classList.remove("hasbar"); document.documentElement.classList.remove("sheet"); setBarH(); return; }
   let html = "";
-  if (S.run) {
+  if (S.game && S.game.format === "gangline") {
+    const g = S.game, p = pd.p, st = gState();
+    const gearSel = [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
+    const sp = g.gSpeed(p, gearSel), n = g.gNext(p, gearSel);
+    const open = document.documentElement.classList.contains("sheet");
+    html = `<div class="mbline"><span>Speed <b class="${n && n.cost != null ? (n.ok ? "ok" : "short") : ""}">${sp.total}</b></span>${n && n.cost != null ? `<span>${esc(g.label(n.nxt))} <b>${n.cost}</b></span>` : ""}<button class="mbmore" data-act="sheet">${open ? "Close" : "Details"}</button></div>`;
+    if (st.sel) html += `<button class="primary" data-act="ghitch" data-v="front">Hitch front</button><button class="primary" data-act="ghitch" data-v="back">Hitch back</button><button data-act="gsel" data-id="${st.sel}">Cancel</button>`;
+    else {
+      const btns = [...document.querySelectorAll("#runpanel .acts > button.act")].filter(b => ["cpcamp", "longrest", "ggo", "gcamp"].includes(b.dataset.act));
+      html += btns.map(b => `<button class="${b.classList.contains("primary") ? "primary" : ""}" data-act="${b.dataset.act}" ${b.disabled ? "disabled" : ""}>${b.querySelector("b").textContent.replace(/^Camp at Checkpoint \d/, "Camp here")}</button>`).join("");
+    }
+  } else if (S.run) {
     const need = $(".summary .vs .col:first-child .big"), have = $(".summary .vs .col:nth-child(2) .big"), verdict = $(".summary .verdict");
     const go = $("#runpanel [data-act=go]");
     html = `<div class="mbsum"><span>Need <b>${need ? need.textContent : "–"}</b></span><span>Have <b class="${have ? have.className.replace("big", "") : ""}">${have ? have.textContent : "–"}</b></span><span class="mbv">${verdict ? verdict.innerHTML : ""}</span></div>
@@ -3372,6 +3454,7 @@ function buildMobileBar() {
   bar.innerHTML = html;
   bar.hidden = !html;
   document.body.classList.toggle("hasbar", !!html);
+  setBarH();
 }
 window.addEventListener("resize", () => { applySize(); if (S.screen === "game" && S.game) renderGame(); });
 
@@ -3474,6 +3557,8 @@ document.addEventListener("click", e => {
     case "slog": if (pd) { const c = $("#uselantern"); resolvePending({ type: "slog", lantern: c ? c.checked : false }); } break;
     case "camp": if (pd) { const c = $("#usebivy"); resolvePending({ type: "camp", bivy: c ? c.checked : false }); } break;
     case "cpcamp": if (pd) { S.g = null; resolvePending({ type: "cp", long: false }); } break;
+    case "sheet": { document.documentElement.classList.toggle("sheet"); document.documentElement.classList.remove("logsheet"); buildMobileBar(); break; }
+    case "logsheet": { const on = document.documentElement.classList.toggle("logsheet"); document.documentElement.classList.remove("sheet"); const lw = $("#logwrap"); if (on && lw) lw.open = true; buildMobileBar(); break; }
     case "gsel": { const st = gState(); st.sel = st.sel === id ? null : id; renderGame(); break; }
     case "ghitch": if (pd) { const st = gState(); const sel = st.sel; st.sel = null; if (sel) resolvePending({ type: "hitch", id: sel, end: b.dataset.v }); } break;
     case "ggear": { const st = gState(); if (st.gear.has(id)) st.gear.delete(id); else st.gear.add(id); renderGame(); break; }
@@ -3543,7 +3628,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 2:10 PM";
+const LT_BUILD = "Oct 16, 2:24 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
