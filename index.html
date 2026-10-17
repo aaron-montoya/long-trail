@@ -644,12 +644,12 @@ const LT = (() => {
     gear: {
       "Booties": "Play as you move onto a trail: your dogs don't tire for that trail.",
       "Dog Food": "One dog in your gangline recovers one step.",
-      "Bivy Sack": "Draw no end-of-turn Event.",
+      "Bivy Sack": "Play when you camp in the open: draw no Event.",
       "Whistle": "One tired dog becomes rested.",
       "Hot Broth": "All your tired dogs become rested.",
     },
     musher: {
-      "Veteran": ["Pressing on never makes you draw an Event.", "Final-leg trails have 1 less Difficulty for you."],
+      "Veteran": ["Only the first trail of each Run makes you draw an Event.", "Final-leg trails have 1 less Difficulty for you."],
       "Trapper": ["When you draw dogs at a checkpoint, including your Long Rest, draw 2 extra and choose which to keep.", "When you take a trail reward, also take the top card of the Dog deck. You may hitch it in place of a dog on your gangline. Drop that dog."],
     },
     noGear: ["Red Lantern"], // nothing to do without Slog
@@ -713,7 +713,10 @@ const LT = (() => {
         if (this.rules.finishCost === undefined) this.rules.finishCost = 3; // Gangline standard: Finish is Difficulty 3
         if (this.rules.lineMax === undefined) this.rules.lineMax = 4; // Gangline standard: at most 4 dogs on your gangline
         if (this.rules.gCpDogs === undefined) this.rules.gCpDogs = 2; // Gangline standard: 2 dogs at a checkpoint camp or Long Rest
-        if (this.rules.gGiveAhead === undefined) this.rules.gGiveAhead = true; // Gangline standard: you may pass your end-of-turn Event ahead
+        if (this.rules.gGiveAhead === undefined) this.rules.gGiveAhead = true; // Gangline standard: you may give an Event to the leader
+        if (this.rules.gEnterEv === undefined) this.rules.gEnterEv = true; // Gangline standard: an Event for each trail you move onto, and when you camp in the open
+        if (this.rules.gGiveAny === undefined) this.rules.gGiveAny = true; // any Event you draw can be given...
+        if (this.rules.gGiveLeader === undefined) this.rules.gGiveLeader = true; // ...but only to the leader
       }
       this.r = rng(this.seed);
       this.round = 0;
@@ -974,8 +977,9 @@ const LT = (() => {
         this.log(`${p.name} draws an Event (${source}): ${e}.`, "ev");
       }
       // Optional take-that: give your end-of-turn Event to a musher ahead of you
-      if (this.rules.gGiveAhead && source === "the trail") {
-        const ahead = this.players.filter(q => q !== p && !q.scratched && q.pos > p.pos && this.path[q.pos].type === "T");
+      if (this.rules.gGiveAhead && (source === "the trail" || (this.rules.gGiveAny && source !== "a tangle"))) {
+        let ahead = this.players.filter(q => q !== p && !q.scratched && q.pos > p.pos && this.path[q.pos].type === "T");
+        if (this.rules.gGiveLeader) { const top = Math.max(...this.players.filter(q => !q.scratched).map(q => q.pos)); ahead = ahead.filter(q => q.pos === top); } // only the leader
         if (ahead.length) {
           const tgt = await this.ask(p, { type: "giveEvent", card: e, options: ahead.map(q => q.idx) });
           const q = tgt == null ? null : ahead.find(x => x.idx === tgt);
@@ -1548,9 +1552,10 @@ const LT = (() => {
         if (this.rules.gTire2 && !bootThis && !vetB && !bootAll && !(booties && this.rules.gBootiesOne)) { const d2 = p.line.filter(d => d.state !== "exh" && d !== tiredNow)[0]; if (d2) await this.gTireDog(p, d2, "breaking trail"); }
         this.upd();
         // Pressing on: every step after the first draws an Event right away (not onto a checkpoint).
-        if (moved > 1 && n.c.type === "T" && !this.rules.gNoStepEv && !(this.rules.gVetA && p.musher === "Veteran" && !p.after)) {
+        const trailEv = (this.rules.gTrailEvOnly || this.rules.gEnterEv) && moved === 1; // optional rule: the first trail of a Run draws an Event too
+        if ((moved > 1 || trailEv) && n.c.type === "T" && !this.rules.gNoStepEv && !(!trailEv && this.rules.gVetA && p.musher === "Veteran" && !p.after)) {
           const here = p.pos;
-          await this.event(p, "pressing on");
+          await this.event(p, trailEv ? "the trail" : "pressing on");
           if (p.scratched || this.over) break;
           if (p.pos !== here) { this.log(`${p.name}'s Run ends.`, "bad"); break; }
         }
@@ -1574,6 +1579,7 @@ const LT = (() => {
         const ids = this.nextFaceDown(p, 1);
         if (ids.length) { this.log(`${p.name}'s Scout looks at the trail ahead.`, ""); await this.tell(p, { type: "peek", trails: ids, source: "Scout" }); }
       }
+      if (this.rules.gEnterEv && moved > 0) p.gWentEv = true; // your Run already drew its Events
       if (this.rules.gEvPerTrail) { for (let i = start + 1; i <= p.pos; i++) if (this.path[i].type === "T") runEvents.push(this.label(i)); p.gWentEv = true; }
       if (this.rules.gPushEv) for (const x of line0) if (x.st === "tired") runEvents.push("pushing " + x.dog.name);
       for (const src of runEvents) { if (p.scratched || this.over) break; await this.event(p, src); }
@@ -1697,7 +1703,7 @@ const LT = (() => {
         if (b && await this.ask(p, { type: "bivyEnd" })) { p.gear.splice(p.gear.indexOf(b), 1); p.used.push(b); quiet = "The Bivy Sack keeps everyone warm."; }
       }
       if (quiet) { if (quiet !== "Checkpoint camp") this.log(`${quiet} No Event this turn.`, "good"); }
-      else await this.event(p, "the trail");
+      else if (!this.rules.gTrailEvOnly) await this.event(p, "the trail");
       if (p.scratched) return;
       const at = p.pos >= 0 ? this.path[p.pos] : null;
       if (at && at.type === "T" && at.name === "Exposed Ridge" && !this.shadowSafe(p)) await this.event(p, "Exposed Ridge");
@@ -2059,6 +2065,8 @@ const ART_G = { files: new Map(), count: 0, cache: new Map() };
 const G_PRINTED = { finish: 3, cpDogs: 1 };
 const useGArt = () => isG() && ART_G.count > 0 && !String(ART.source || "").startsWith("your");
 const gArt = keys => useGArt() ? artFor(keys, ART_G) : null;
+// Gangline card images printed before their text changed: show text until new images arrive
+const G_ART_STALE = new Set(["Bivy Sack", "Veteran"]);
 function setArt(entries, source) {
   for (const u of ART.files.values()) if (u.startsWith("blob:")) URL.revokeObjectURL(u);
   ART.files = new Map(); ART.source = source;
@@ -2197,7 +2205,7 @@ function dogCard(d, o = {}) {
   return st === "exh" && !o.flat ? `<div class="exhwrap" style="--w:${o.w ? o.w + "px" : "var(--handw)"}">${card}</div>` : card;
 }
 function gearCard(g, o = {}) {
-  const url = gArt(artKeys.gear(g)) || (gAlt("gear", g.name) ? null : artFor(artKeys.gear(g)));
+  const url = (G_ART_STALE.has(g.name) ? null : gArt(artKeys.gear(g))) || (gAlt("gear", g.name) ? null : artFor(artKeys.gear(g)));
   const cls = ["card", "gear", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : ""].join(" ");
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(g.name)}</div><div class="cs">Gear</div><div class="cx">${esc(g.text)}</div>`;
   const card = `<div class="${cls}" ${o.attrs || ""} data-zoom="${esc("gear|" + g.name)}" title="${esc(g.name + ": " + g.text)}">${inner}${o.flag ? `<span class="stateflag">${esc(o.flag)}</span>` : ""}${zb(o, "gear|" + g.name)}</div>`;
@@ -2218,7 +2226,7 @@ function eventCard(e, o = {}) {
   return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + evText(e))}">${inner}${zb(o, "event|" + e)}</div>`;
 }
 function musherCard(p, o = {}) {
-  const url = gArt(artKeys.musher(p.musher)) || (gAlt("musher", p.musher) ? null : artFor(artKeys.musher(p.musher)));
+  const url = (G_ART_STALE.has(p.musher) ? null : gArt(artKeys.musher(p.musher))) || (gAlt("musher", p.musher) ? null : artFor(artKeys.musher(p.musher)));
   const t = musherT(p.musher);
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(p.musher)}</div><div class="cs">${p.after ? "After Long Rest" : "Before Long Rest"}</div><div class="cx">${esc(t[p.after ? 1 : 0])}</div>`;
   return `<div class="card musher" data-zoom="${esc("musher|" + p.musher + "|" + (p.after ? 1 : 0))}" title="${esc(p.musher)}">${url && p.after ? inner.replace('class="art"', 'class="art" style="transform:rotate(180deg)"') : inner}</div>`;
@@ -2263,7 +2271,7 @@ const S = {
   gLineMax: store.get("gGen", 0) >= 2 ? store.get("gLineMax", 4) : 4, // Gangline: most dogs on your gangline (standard 4)
   gFinish: store.get("gGen", 0) >= 2 ? store.get("gFinish", 3) : 3, // Gangline: Finish Difficulty (standard 3)
   gCpDogs: store.get("gGen", 0) >= 3 ? store.get("gCpDogs", 2) : 2, // Gangline: dogs taken at a checkpoint camp or Long Rest (standard 2)
-  gGive: store.get("gGen", 0) >= 3 ? store.get("gGive", true) : true, // Gangline: pass your end-of-turn Event ahead (standard on)
+  gGive: store.get("gGen", 0) >= 3 ? store.get("gGive", true) : true, // Gangline: you may give an Event you draw to the leader (standard on)
   legs: store.get("legs", [1, 2, 4]),
   game: null,
   pending: null,      // {p, req, resolve}
@@ -2496,7 +2504,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 16, 2:48 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 17, 8:26 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2567,7 +2575,7 @@ function renderSetup() {
       </div>
       <p class="small">How many dogs you take when you camp at a checkpoint or take your Long Rest. You always take 1 gear.</p>
       <div class="modes" style="margin-top:10px">
-        <label><input type="checkbox" id="rule-give" ${S.gGive ? "checked" : ""}> <span><b>Pass Events ahead (standard)</b><small>When you draw your end-of-turn Event, you may give it to a musher ahead of you on a trail instead. They resolve it. Not for Events from pressing on or from a card.</small></span></label>
+        <label><input type="checkbox" id="rule-give" ${S.gGive ? "checked" : ""}> <span><b>Give Events to the leader (standard)</b><small>When you draw an Event and another musher is leading the race on a trail, you may give it to them instead. They resolve it.</small></span></label>
       </div>
       `}
       <div class="opts" style="margin-top:12px">
@@ -2859,7 +2867,7 @@ function gActionsHTML(p, st) {
   else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
   else if (n.blocked) goSub = "Tank won't go on River Ice, and he's your only hitched dog.";
   else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
-  else goSub = `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire. Every trail after the first draws an Event.`;
+  else goSub = `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire, then you draw an Event (not at a checkpoint).`;
   h += btn("ggo", "Run", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
   const mustHitch = !p.line.length && hand.length;
   if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
@@ -3154,9 +3162,9 @@ function renderModal() {
         <div class="btns"><button data-act="pick" data-v="0">Take it</button><button class="primary" data-act="pick" data-v="1">Ignore it</button></div>`);
     case "giveEvent": {
       const ahead = r.options.map(i => g.players[i]).filter(Boolean);
-      return modal(`<div class="label">${esc(p.name)} · end-of-turn Event</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>
-        <p class="small">You may pass this Event ahead to a musher in front of you. They resolve it instead of you.</p>
-        <div class="btns">${ahead.map(q => `<button data-act="pick" data-v="${q.idx}">Give to ${esc(q.name)}</button>`).join("")}<button class="primary" data-act="pick" data-v="">Keep it</button></div>`);
+      return modal(`<div class="label">${esc(p.name)} · Event</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>
+        <p class="small">You may give this Event to the leader. They resolve it instead of you.</p>
+        <div class="btns">${ahead.map(q => `<button data-act="pick" data-v="${q.idx}">Give to ${esc(q.name)} (leader)</button>`).join("")}<button class="primary" data-act="pick" data-v="">Keep it</button></div>`);
     }
     case "trapSwap": {
       const nd = p.dogs.find(d => d.id === r.dog);
@@ -3168,8 +3176,8 @@ function renderModal() {
     }
     case "bivyEnd": {
       const b = p.gear.find(x => x.name === "Bivy Sack");
-      return modal(`<div class="label">${esc(p.name)} · end of turn</div><h3>Use your Bivy Sack?</h3><div class="cards">${b ? gearCard(b) : ""}</div>
-        <p>You're about to draw your end-of-turn Event. Play the Bivy Sack to draw no Event. It becomes used gear until your Long Rest.</p>
+      return modal(`<div class="label">${esc(p.name)} · camping</div><h3>Use your Bivy Sack?</h3><div class="cards">${b ? gearCard(b) : ""}</div>
+        <p>You're camping in the open and about to draw an Event. Play the Bivy Sack to draw no Event. It becomes used gear until your Long Rest.</p>
         <div class="btns"><button data-act="pick" data-v="0">Draw the Event</button><button class="primary" data-act="pick" data-v="1">Use Bivy Sack</button></div>`);
     }
     case "gContinue":
@@ -3276,9 +3284,10 @@ function rulesHTML() {
     <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2. The Finish is Difficulty ${finCost()}.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules.lineMax : S.gLineMax) || 4} dogs. Dogs not in the line are in your hand.</li>
     <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line. If your line is empty, you must hitch.</li>
-    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted). Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. <b>Every trail after the first in a Run draws an Event right away</b> (not a checkpoint). If an Event moves you back, your Run ends. Take the reward where you stop.</li>
-    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested). You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
-    <li><b>3. Event:</b> draw one Event after you Run or Camp. No Events at all before Checkpoint 1, and none if you end your turn at a checkpoint.${((g ? g.rules.gGiveAhead : S.gGive)) ? " <b>Pass it ahead:</b> you may give your end-of-turn Event to a musher ahead of you on a trail instead. They resolve it. The leader breaks trail and takes the weather." : ""}</li>
+    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted), then you <b>draw an Event</b> for that trail. Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. If an Event moves you back, your Run ends. Take the reward where you stop.</li>
+    <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested), then <b>draw an Event</b>. You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
+    <li><b>Events:</b> one for each trail you move onto, and one when you camp in the open. Never at a checkpoint: moving onto or camping at a checkpoint is free. No Events before Checkpoint 1.${((g ? g.rules.gGiveAhead : S.gGive)) ? " <b>Give it to the leader:</b> when you draw an Event and another musher is leading the race on a trail, you may give it to them instead. They resolve it." : ""}</li>
+    <li><b>Drafting:</b> a trail another musher is on or has passed is 1 less Difficulty for you (Deep Powder: 3 less). The leader breaks trail and takes the weather; everyone behind follows their tracks.</li>
     <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe from that. You're also scratched if you camp in the open when every dog in your gangline is already rested, you have no dogs in your hand, and your Speed still can't cover the next trail.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
     <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed, role bonus and any ability printed on their tired half. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
@@ -3652,7 +3661,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 16, 2:48 PM";
+const LT_BUILD = "Oct 17, 8:26 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
