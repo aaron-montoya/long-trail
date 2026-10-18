@@ -643,6 +643,7 @@ const LT = (() => {
     },
     gear: {
       "Booties": "Play as you move onto a trail: your dogs don't tire for that trail.",
+      "Snack": "Play as you move onto a trail: +2 Speed for that trail.",
       "Dog Food": "One dog in your gangline recovers one step.",
       "Bivy Sack": "Play when you camp in the open: draw no Event.",
       "Whistle": "One tired dog becomes rested.",
@@ -1498,7 +1499,7 @@ const LT = (() => {
       this.upd();
     }
     async gGo(p, action) {
-      const gearSel = (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean);
+      let gearSel = (action.gear || []).map(id => p.gear.find(g => g.id === id)).filter(Boolean);
       for (const g of gearSel) { p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g); }
       const booties = gearSel.some(g => g.name === "Booties");
       const line0 = this.gLine(p);
@@ -1511,13 +1512,22 @@ const LT = (() => {
       const runEvents = [];
       this.log(`${p.name} sets off: Speed ${this.gSpeed(p, gearSel).total}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}.`, "act");
       while (!this.over && !p.scratched) {
-        const n = this.gNext(p, gearSel);
+        let n = this.gNext(p, gearSel), snackNow = false;
+        // Snack: +2 Speed for one trail. Played mid-Run when it's what gets you onto the next trail.
+        if (moved > 0 && n && !n.ok && !this.over) {
+          const sc = p.gear.find(g => g.name === "Snack");
+          const n2 = sc && this.gNext(p, [...gearSel, sc]);
+          if (n2 && n2.ok && await this.ask(p, { type: "gSnack", speed: n2.speed, cost: n2.cost, next: n2.nxt, label: this.label(n2.nxt) })) {
+            p.gear.splice(p.gear.indexOf(sc), 1); p.used.push(sc); n = n2; snackNow = true;
+            this.log(`${p.name} hands out a Snack: +2 Speed for ${this.label(n2.nxt)}.`, "good");
+          }
+        }
         if (!n || !n.ok) break;
         if (this.rules.gMaxSteps && moved >= this.rules.gMaxSteps) break;
         // Booties: your dogs don't tire for one trail. Played at the start of a Run it covers the first trail;
         // you may also play one from your hand on any later trail of the Run.
         let bootThis = moved === 0 && booties;
-        if (moved > 0) {
+        if (moved > 0 && !snackNow) {
           const bootCard = p.gear.find(g => g.name === "Booties");
           const go = await this.ask(p, { type: "gContinue", speed: n.speed, cost: n.cost, next: n.nxt, label: this.label(n.nxt), canBoot: !!bootCard });
           if (!go) break;
@@ -1525,6 +1535,7 @@ const LT = (() => {
         }
         if (n.tankOff) { for (const d of p.line.filter(d => d.ab === "heavy")) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; } this.log(`Tank won't go on River Ice and goes back to ${p.name}'s hand.`, ""); }
         p.pos = n.nxt; moved++;
+        if (moved === 1) gearSel = gearSel.filter(g => g.name !== "Snack"); // a Snack played at the start covers only the first trail
         if (this.format === "gangline" && moved === 1) p.campedLast = false; // Night Runner: the bonus covers only the first trail after camping
         this.onMoveOnto(n.nxt);
         // Optional: overtaking on a narrow trail tangles the musher you pass
@@ -2013,6 +2024,7 @@ const LT = (() => {
         case "giveEvent": { if (HARSH[req.card] < 3) return null; const ps = req.options.map(i => g.players[i]); return ps.sort((a, b) => b.pos - a.pos)[0].idx; }
         case "trapSwap": { const w = p.line.find(d => d.state === "exh"); return w ? w.id : ""; }
         case "bivyEnd": return p.line.some(d => d.state === "exh") || p.line.filter(d => d.state === "tired").length >= 2;
+        case "gSnack": return Bot.answer(g, p, { ...req, type: "gContinue", canBoot: false }) !== false;
         case "gContinue": {
           const f = p.line[0];
           const live = p.line.filter(d => d.state !== "exh").length;
@@ -2072,7 +2084,7 @@ const G_PRINTED = { finish: 3, cpDogs: 1 };
 const useGArt = () => isG() && ART_G.count > 0 && !String(ART.source || "").startsWith("your");
 const gArt = keys => useGArt() ? artFor(keys, ART_G) : null;
 // Gangline card images printed before their text changed: show text until new images arrive
-const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind"]);
+const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind", "Snack"]);
 function setArt(entries, source) {
   for (const u of ART.files.values()) if (u.startsWith("blob:")) URL.revokeObjectURL(u);
   ART.files = new Map(); ART.source = source;
@@ -2510,7 +2522,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 18, 11:50 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 18, 11:53 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3192,6 +3204,13 @@ function renderModal() {
         <p class="small">If you keep going, your first 2 dogs that aren't exhausted tire${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
         ${g.gStepSpends(p) && g.path[r.next] && g.path[r.next].type === "T" ? `<p class="small" style="color:var(--bad)"><b>Danger:</b> this step exhausts your whole team. End your turn on a trail like that and you're scratched.</p>` : ""}
         <div class="btns"><button data-act="pick" data-v="0">Stop here</button>${r.canBoot ? `<button data-act="pick" data-v="2">Keep going with Booties (no tiring)</button>` : ""}<button class="primary" data-act="pick" data-v="1">Keep going</button></div>`);
+    case "gSnack": {
+      const sc = p.gear.find(x => x.name === "Snack");
+      return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Eat a Snack to keep going?</h3><div class="cards">${sc ? gearCard(sc) : ""}</div>
+        <p>Your team's Speed is <b>${r.speed - 2}</b>, and ${esc(r.label)} has Difficulty <b>${r.cost}</b>. A Snack gives +2 Speed for that trail.</p>
+        <p class="small">If you keep going, your first 2 dogs that aren't exhausted tire${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
+        <div class="btns"><button data-act="pick" data-v="0">Stop here</button><button class="primary" data-act="pick" data-v="1">Use Snack and keep going</button></div>`);
+    }
     case "alpineIgnore":
       return modal(`<div class="label">${esc(p.name)} · Event from ${esc(r.source)}</div><h3>${esc(r.card)}</h3><div class="cards">${eventCard(r.card)}</div><p>${esc(evText(r.card))}</p>
         <p class="small">Alpine ran this turn: you may ignore one Event you draw this turn.</p>
@@ -3625,7 +3644,7 @@ document.addEventListener("click", e => {
     case "pick": if (pd) {
       const v = b.dataset.v, t = pd.req.type;
       if (t === "pickEvent") resolvePending(+v);
-      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP" || t === "alpineIgnore" || t === "bivyEnd") resolvePending(v === "1");
+      else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP" || t === "alpineIgnore" || t === "bivyEnd" || t === "gSnack") resolvePending(v === "1");
       else if (t === "gContinue") resolvePending(v === "2" ? "boot" : v === "1");
       else if (t === "giveEvent") resolvePending(v === "" ? null : +v);
       else resolvePending(v);
@@ -3667,7 +3686,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 18, 11:50 AM";
+const LT_BUILD = "Oct 18, 11:53 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
