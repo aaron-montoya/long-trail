@@ -1505,7 +1505,7 @@ const LT = (() => {
       if ((this.rules.gAlpineFront ? line0.slice(0, 1) : line0).some(x => x.dog.ab === "ignore1" && (x.st === "rested" || (x.st !== "exh" && x.dog.tt)))) p.ignoreLeft = 1;
       p.shadowTurn = line0.some(x => x.st === "rested" && x.dog.ab === "shadow");
       if (this.rules.gTireAll) for (const d of p.line.slice(1)) this.gTire(d);
-      const start = p.pos; p._passed = new Set();
+      const start = p.pos; p._passed = new Set(); p._gRunning = true; p._pendRB = 0; p._pendCM = 0;
       const bonus0 = p.runBonus, kept0 = p.keptEvents.length, cost0 = p.costMod;
       let moved = 0;
       const runEvents = [];
@@ -1570,6 +1570,7 @@ const LT = (() => {
       // Gangline: a Tailwind drawn during this Run has already helped it, so it is discarded now
       const fresh = p.keptEvents.slice(kept0), tw = fresh.filter(e => e === "Tailwind").length;
       p.runBonus -= bonus0 + tw; p.keptEvents = fresh.filter(e => e !== "Tailwind"); p.costMod -= cost0; p.campedLast = false;
+      p._gRunning = false; p.runBonus += p._pendRB || 0; p.costMod += p._pendCM || 0; p._pendRB = 0; p._pendCM = 0; // Northern Lights / Fresh Snow drawn on this Run now apply
       if (this.rules.gBrambleRested) { if (moved) for (const x of line0) if (x.st === "rested" && x.dog.ab === "bramble" && p.line.includes(x.dog) && x.dog.state !== "exh") { x.dog.state = this.rules.gBrambleTired ? "tired" : "exh"; this.log(`Bramble ran rested and is ${x.dog.state === "exh" ? "exhausted" : "tired"}.`, ""); } }
       else if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
@@ -1654,8 +1655,9 @@ const LT = (() => {
         case "Whiteout": p.noGo = true; this.log(`${p.name} can't Run next turn.`, "bad"); break;
         case "Second Wind": { const d = await pickLine(d => d.state === "tired" || ((this.rules.gEvV2 || this.rules.gEvWind2) && d.state === "exh"), "Choose a dog to recover one step."); if (d) { d.state = d.state === "exh" ? "tired" : "rested"; this.log(`${d.name} gets a second wind.`, "good"); } break; }
         case "Tailwind": p.runBonus += 1; p.keptEvents.push(e); break;
-        case "Northern Lights": p.runBonus += 2; p.keptEvents.push(e); break;
-        case "Fresh Snow": p.costMod += 1; p.keptEvents.push(e); break;
+        // Gangline: drawn during a Run, these wait for your next Run
+        case "Northern Lights": if (p._gRunning) p._pendRB = (p._pendRB || 0) + 2; else p.runBonus += 2; p.keptEvents.push(e); break;
+        case "Fresh Snow": if (p._gRunning) p._pendCM = (p._pendCM || 0) + 1; else p.costMod += 1; p.keptEvents.push(e); break;
         case "Moose on the Trail": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } else this.moveBack(p); break; }
         case "Squirrel!": if (line.length > 1) { const f = line.shift(); line.push(f); this.log(`${f.name} chases a squirrel to the back of the line.`, "bad"); } break;
         case "Sore Paws": { const d = await pickLine(d => d.state === "tired", "Choose a tired dog to exhaust."); if (d) { d.state = "exh"; this.log(`${d.name} is exhausted (${e}).`, "bad"); } break; }
@@ -2508,7 +2510,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 18, 11:49 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 18, 11:50 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3665,7 +3667,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 18, 11:49 AM";
+const LT_BUILD = "Oct 18, 11:50 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
