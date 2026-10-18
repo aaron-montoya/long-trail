@@ -613,7 +613,7 @@ const LT = (() => {
   const G_EVENTS = [
     ["Clear Skies", 2, "No effect."],
     ["Northern Lights", 1, "Keep this card. Your next Run gets +2 Speed, then discard it."],
-    ["Tailwind", 2, "Keep this card. Your next Run gets +1 Speed, then discard it."],
+    ["Tailwind", 2, "Keep this card. Your current Run gets +1 Speed, or your next Run if you aren't on one. Then discard it."],
     ["Fresh Snow", 2, "Keep this card. On your next Run, every trail has 1 more Difficulty. Then discard this card."],
     ["Bitter Cold", 8, "Drop an exhausted dog. If you have none, one tired dog becomes exhausted."],
     ["Blizzard", 3, "Drop an exhausted dog. Then move back one trail, but never past a checkpoint."],
@@ -1567,7 +1567,9 @@ const LT = (() => {
         await this.claim(p, line0, p.pos); // Gangline: you only take a reward if your Run ends on that trail
       }
       // Tailwind cards kept before this Go are used up; one drawn while pressing on waits for your next Go
-      p.runBonus -= bonus0; p.keptEvents = p.keptEvents.slice(kept0); p.costMod -= cost0; p.campedLast = false;
+      // Gangline: a Tailwind drawn during this Run has already helped it, so it is discarded now
+      const fresh = p.keptEvents.slice(kept0), tw = fresh.filter(e => e === "Tailwind").length;
+      p.runBonus -= bonus0 + tw; p.keptEvents = fresh.filter(e => e !== "Tailwind"); p.costMod -= cost0; p.campedLast = false;
       if (this.rules.gBrambleRested) { if (moved) for (const x of line0) if (x.st === "rested" && x.dog.ab === "bramble" && p.line.includes(x.dog) && x.dog.state !== "exh") { x.dog.state = this.rules.gBrambleTired ? "tired" : "exh"; this.log(`Bramble ran rested and is ${x.dog.state === "exh" ? "exhausted" : "tired"}.`, ""); } }
       else if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
@@ -2068,7 +2070,7 @@ const G_PRINTED = { finish: 3, cpDogs: 1 };
 const useGArt = () => isG() && ART_G.count > 0 && !String(ART.source || "").startsWith("your");
 const gArt = keys => useGArt() ? artFor(keys, ART_G) : null;
 // Gangline card images printed before their text changed: show text until new images arrive
-const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner"]);
+const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind"]);
 function setArt(entries, source) {
   for (const u of ART.files.values()) if (u.startsWith("blob:")) URL.revokeObjectURL(u);
   ART.files = new Map(); ART.source = source;
@@ -2223,7 +2225,7 @@ const musherT = m => gAlt("musher", m) || LT.MUSHERS[m];
 const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : LT.EVENT_TEXT[e]) || "";
 function eventCard(e, o = {}) {
   // Gangline: use the art only when the printed (Classic) text matches how the card works here
-  const url = gArt(artKeys.event(e)) || (isG() && LT.G_EVENT_TEXT[e] !== LT.EVENT_TEXT[e] ? null : artFor(artKeys.event(e)));
+  const url = (G_ART_STALE.has(e) ? null : gArt(artKeys.event(e))) || (isG() && LT.G_EVENT_TEXT[e] !== LT.EVENT_TEXT[e] ? null : artFor(artKeys.event(e)));
   const inner = url ? img(url) : `<div class="band"></div><div class="ct">${esc(e)}</div><div class="cs">Event</div><div class="cx">${esc(evText(e))}</div>`;
   return `<div class="card event ${o.pick ? "pick" : ""} ${o.sel ? "sel" : ""}" ${o.attrs || ""} data-zoom="${esc("event|" + e)}" title="${esc(e + ": " + evText(e))}">${inner}${zb(o, "event|" + e)}</div>`;
 }
