@@ -96,6 +96,7 @@ button.ghost { background: transparent; }
 .slotlab { font-size: 11.5px; color: var(--muted); font-weight: 600; text-align: center; }
 .slot.proj .card { outline: 3px dashed var(--hl); outline-offset: 2px; }
 .slot.projend .card { outline: 3px solid var(--hl); outline-offset: 2px; }
+.slot.projno .card { outline: 3px dashed var(--bad); outline-offset: 2px; }
 .slot .rewmini { --w: calc(var(--stripw) * .7); margin-top: -2px; }
 .board .card { --w: var(--handw); }
 [data-zoom] { cursor: zoom-in; }
@@ -2539,7 +2540,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 20, 10:30 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 20, 10:34 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2727,9 +2728,22 @@ function projection() {
   return { line, gear, pv };
 }
 
+// Gangline: highlight the trail you'd move onto next (solid if your Speed covers it, red dashed if not)
+function gProjection() {
+  const g = S.game, pd = S.pending;
+  if (!isG() || !pd || pd.p.bot || pd.p.scratched) return null;
+  const p = pd.p, r = pd.req;
+  if (r.type === "gContinue" || r.type === "gSnack") return { pos: r.next, ok: true };
+  let gear;
+  if (r.type === "action") gear = [...gState().gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
+  else if (p._gRunning && DOCK.has(r.type)) gear = p._gRunGear || [];
+  else return null;
+  const n = g.gNext(p, gear);
+  return n ? { pos: n.nxt, ok: !!n.ok } : null;
+}
 function renderStrip() {
   const g = S.game;
-  const pr = projection();
+  const pr = projection(), gp = gProjection();
   const projSet = new Set(pr && pr.pv ? pr.pv.steps.map(s => s.pos) : []);
   const end = pr && pr.pv && pr.pv.crossed ? pr.pv.end : null;
   const tok = pos => g.players.filter(p => p.pos === pos && !p.scratched).map(p => `<span class="tok" style="background:${p.color}" title="${esc(p.name)} (${esc(p.musher)})">${esc(p.name[0].toUpperCase())}</span>`).join("");
@@ -2737,7 +2751,7 @@ function renderStrip() {
   g.path.forEach((c, i) => {
     let lab = c.type === "CP" ? `Checkpoint ${c.cp}` : c.type === "F" ? "Finish" : `Trail ${g.trailNo(i)}${g.finalLeg(i) ? " · final" : ""}`;
     const rw = c.type === "T" && c.reward ? (c.reward.kind === "dog" ? dogCard(c.reward.card, { w: 60 }).replace('class="card', 'class="card rewmini') : gearCard(c.reward.card).replace('class="card', 'class="card rewmini')) : "";
-    html += `<div class="slot ${projSet.has(i) ? (i === end ? "projend" : "proj") : ""}"><div class="tokens">${tok(i)}</div>${trailCard(c, i)}<div class="slotlab">${lab}</div>${rw}</div>`;
+    html += `<div class="slot ${gp && gp.pos === i ? (gp.ok ? "projend" : "projno") : projSet.has(i) ? (i === end ? "projend" : "proj") : ""}"><div class="tokens">${tok(i)}</div>${trailCard(c, i)}<div class="slotlab">${lab}</div>${rw}</div>`;
   });
   $("#strip").innerHTML = html;
 }
@@ -2915,7 +2929,8 @@ function gActionsHTML(p, st) {
     const ord = gOrder(p, st);
     h += `<div class="small" style="margin-top:8px">If you camp, also rearrange your line (front → back):</div><div class="row2">${ord.map((d, i) => `<span class="chipbtn" style="display:inline-flex;gap:4px;align-items:center"><button class="ghost" data-act="gmove" data-id="${d.id}" data-v="-1" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(d.name)} forward">◀</button>${esc(d.name)}<button class="ghost" data-act="gmove" data-id="${d.id}" data-v="1" ${i === ord.length - 1 ? "disabled" : ""} aria-label="Move ${esc(d.name)} back">▶</button></span>`).join("")}</div>`;
   }
-  h += `<div class="small" style="margin-top:8px">3 · After you Run or Camp, draw one Event (none before Checkpoint 1 or if you end at a checkpoint).</div>`;
+  h += `<div class="small" style="margin-top:8px">Events: draw one for each trail you move onto and when you camp in the open (never at a checkpoint or before Checkpoint 1). You may give any Event to the leader.</div>`;
+  h += `<div class="small" style="margin-top:4px">3 · Scratch check: you're out if your gangline is empty, or you're on a trail and every dog in it is exhausted.</div>`;
   return h;
 }
 
@@ -3717,7 +3732,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 20, 10:30 AM";
+const LT_BUILD = "Oct 20, 10:34 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
