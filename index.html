@@ -653,6 +653,14 @@ const LT = (() => {
       "Jim Bucket": ["+1 for each other dog in your line that isn't exhausted.", ""],
       "Anvil": ["+2 if 2 or more dogs in your line aren't exhausted.", ""],
       "Boulder": ["While Boulder is on your gangline and rested, Events can't move you back a trail.", ""],
+      // Position dogs: [rested text, tired text, rested Speed, tired Speed, ability]
+      "Willow": ["+2 if the dog directly behind Willow is a Team dog.", "", 1, 3, "pW"],
+      "Ember": ["+1 for each rested dog next to Ember.", "", 2, 2, "pE"],
+      "Echo": ["+2 while Echo is second in your gangline.", "", 2, 2, "pEc"],
+      "Dash": ["+2 while Dash is at the back of your gangline.", "", 2, 1, "pD"],
+      "Bear": ["+2 if the dog directly ahead of Bear is tired.", "", 2, 2, "pB"],
+      "Brick": ["+1 for each tired dog ahead of Brick.", "", 1, 3, "pBr"],
+      "Old Ben": ["While Old Ben is second, the front dog doesn't tire.", "While Old Ben is second, the front dog doesn't tire.", 2, 3, "pOB"],
     },
     gear: {
       "Booties": "Play as you move onto a trail: your dogs don't tire for that trail.",
@@ -761,7 +769,7 @@ const LT = (() => {
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: this.format === "gangline" && G_ALT.gearCount[g[0]] != null ? G_ALT.gearCount[g[0]] : g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
       if (this.format === "gangline") {
         this.gearDeck = this.gearDeck.filter(g => !G_ALT.noGear.includes(g.name));
-        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; if (a[2] != null) d.rs = a[2]; if (a[3] != null) d.ts = a[3]; d.gAlt = true; } }
+        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; if (a[2] != null) d.rs = a[2]; if (a[3] != null) d.ts = a[3]; if (a[4] !== undefined) d.ab = a[4]; d.gAlt = true; } }
         for (const g of this.gearDeck) { const a = G_ALT.gear[g.name]; if (a) { g.text = a; g.gAlt = true; } }
       }
       this.eventDeck = this.shuffle((this.format === "gangline" ? G_EVENTS : EVENTS).flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
@@ -889,6 +897,13 @@ const LT = (() => {
         if (d.ab === "underdog" && this.players.some(q => q !== p && !q.scratched && q.pos > p.pos)) v += this.rules.gUnderdog || 2;
         if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
         if (d.ab === "aurora" && p.pos >= 0 && this.finalLeg(p.pos)) v += 2;
+        // Gangline position dogs
+        if (d.ab === "pW" && line[i + 1] && line[i + 1].dog.role === "Team") v += 2;
+        if (d.ab === "pE") v += [line[i - 1], line[i + 1]].filter(y => y && y.st === "rested").length;
+        if (d.ab === "pEc" && i === 1) v += 2;
+        if (d.ab === "pD" && i === line.length - 1 && line.length > 1) v += 2;
+        if (d.ab === "pB" && line[i - 1] && line[i - 1].st === "tired") v += 2;
+        if (d.ab === "pBr") v += line.slice(0, i).filter(y => y.st === "tired").length;
         add(v, d.name);
       });
       add(this.leadBonus(p, line, gearSel), "Lead bonus");
@@ -1459,7 +1474,7 @@ const LT = (() => {
         if (back.length) this.log(`${p.name} brings ${back.map(d => d.name).join(", ")} back to hand.`, "");
         // When you camp, you may rearrange your line (bots use their usual best order)
         if (p.bot && !action.order && !this.rules.gNoRearrange && p.line.length > 1) {
-          const ord = Bot.arrange(p.line.map(d => ({ dog: d, st: d.state }))).map(x => x.dog);
+          const ord = Bot.gBest(this, p, p.line.map(d => ({ dog: d, st: d.state }))).map(x => x.dog);
           if (ord.length === p.line.length) action = { ...action, order: ord.map(d => d.id) };
         }
         if (action.order && action.order.length && !this.rules.gNoRearrange) {
@@ -1502,6 +1517,8 @@ const LT = (() => {
     }
     // Each step, the front-most dog that isn't exhausted tires: the first dog gets tired, then exhausted, then the second dog, and so on.
     async gTireLead(p, why) {
+      const [a, b] = p.line;
+      if (a && b && a.state !== "exh" && b.state !== "exh" && b.ab === "pOB") { this.log(`${b.name} keeps ${a.name} fresh.`, "good"); return; } // Old Ben
       const f = p.line.find(d => d.state !== "exh");
       if (!f) return;
       return this.gTireDog(p, f, why);
@@ -1876,6 +1893,25 @@ const LT = (() => {
   const dogVal = d => d.rs + 0.5 * d.ts + (d.ab ? 0.5 : 0);
 
   const Bot = {
+    // Gangline: try every order and keep the one with the most Speed over the next 3 trails
+    gBest(g, p, line) {
+      if (line.length < 2 || line.length > 6) return Bot.arrange(line);
+      const tire = s => s === "rested" ? "tired" : "exh";
+      const score = o => {
+        let L = o.map(x => ({ dog: x.dog, st: x.st })), tot = 0;
+        for (let k = 0; k < 3; k++) {
+          tot += g.speedOf(p, L, []).total * (1 - 0.15 * k);
+          const shield = L[1] && L[0].st !== "exh" && L[1].st !== "exh" && L[1].dog.ab === "pOB";
+          let n = 0; L.forEach((x, i) => { if (x.st !== "exh" && n < 2) { if (!(shield && i === 0)) x.st = tire(x.st); n++; } });
+        }
+        return tot;
+      };
+      const perms = a => a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r]));
+      const habit = Bot.arrange(line);
+      let best = habit, bv = score(habit);
+      for (const o of perms(line)) { const v = score(o); if (v > bv + 0.01) { bv = v; best = o; } }
+      return best;
+    },
     arrange(dogs) { // dogs: [{dog, st}] -> best order
       const r = dogs.filter(x => x.st === "rested"), t = dogs.filter(x => x.st === "tired");
       const leads = dogs.filter(x => x.dog.role === "Lead");
@@ -2102,7 +2138,7 @@ const G_PRINTED = { finish: 3, cpDogs: 1 };
 const useGArt = () => isG() && ART_G.count > 0 && !String(ART.source || "").startsWith("your");
 const gArt = keys => useGArt() ? artFor(keys, ART_G) : null;
 // Gangline card images printed before their text changed: show text until new images arrive
-const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind", "Snack"]);
+const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind", "Snack", "Willow", "Ember", "Echo", "Dash", "Bear", "Brick", "Old Ben"]);
 function setArt(entries, source) {
   for (const u of ART.files.values()) if (u.startsWith("blob:")) URL.revokeObjectURL(u);
   ART.files = new Map(); ART.source = source;
@@ -2227,7 +2263,7 @@ const zb = (o, spec) => o.pick ? `<button class="zoomb" data-act="zoom" data-z="
 const img = url => url ? `<img class="art" src="${esc(url)}" alt="" draggable="false">` : "";
 function dogCard(d, o = {}) {
   const st = o.state || d.state;
-  const url = o.noArt ? null : (gArt(artKeys.dog(d)) || (gAlt("dog", d.name) || STALE_ART.has(d.name) ? null : artFor(artKeys.dog(d))));
+  const url = o.noArt ? null : ((isG() && G_ART_STALE.has(d.name) ? null : gArt(artKeys.dog(d))) || (gAlt("dog", d.name) || STALE_ART.has(d.name) ? null : artFor(artKeys.dog(d))));
   const cls = ["card", "dog", o.pick ? "pick" : "", o.sel ? "sel" : "", o.dim ? "dim" : "", st === "tired" ? (url ? "tired-art" : "tired-txt") : ""].join(" ");
   const attrs = o.attrs || "";
   let inner;
@@ -2540,7 +2576,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 20, 10:34 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 20, 11:03 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3732,7 +3768,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 20, 10:34 AM";
+const LT_BUILD = "Oct 20, 11:03 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
