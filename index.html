@@ -458,6 +458,18 @@ html.phone .acts .act span { font-size: 12px; }
 .modal .cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 14px 0; }
 .modal .cards .card { --w: min(170px, 40vw); }
 .modal .btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.scrim.dock { background: transparent; place-items: end end; }
+.scrim.dock .modal { max-width: 420px; padding: 12px 14px; border: 1px solid var(--line); box-shadow: 0 8px 30px rgba(0,0,0,.45); }
+.scrim.dock .modal h3 { font-size: 17px; }
+.scrim.dock .modal p { font-size: 14px; }
+.scrim.dock .modal .cards { margin: 8px 0; }
+.scrim.dock .modal .cards .card { --w: 96px; }
+.runinfo { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 14px; padding: 7px 10px; margin: -2px 0 10px; border-radius: 8px; background: var(--bg2); }
+.runinfo b { font-size: 17px; }
+.runinfo .ok { color: var(--good); font-weight: 600; } .runinfo .no { color: var(--bad); font-weight: 600; } .runinfo .muted { color: var(--muted); }
+html.phone .scrim.dock { place-items: end stretch; padding-bottom: calc(var(--barh, 0px) + 6px); }
+html.phone .scrim.dock .modal { max-width: none; max-height: 52vh; }
+html.phone .scrim.dock .modal .cards .card { --w: 72px; }
 .pass { text-align: center; }
 .pass .who { font-family: Bitter, serif; font-size: 30px; font-weight: 800; margin: 8px 0 16px; }
 
@@ -1438,6 +1450,25 @@ const LT = (() => {
     gLine(p) { return p.line.map(d => ({ dog: d, st: d.state })); }
     gHand(p) { return p.dogs.filter(d => !p.line.includes(d)); }
     gSpeed(p, gearSel = []) { return this.speedOf(p, this.gLine(p), gearSel); }
+    // Camping (in the open or at a checkpoint): send dogs back to hand, then rearrange the line
+    gArrange(p, action) {
+        let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
+        if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
+        for (const d of back) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; }
+        if (back.length) this.log(`${p.name} brings ${back.map(d => d.name).join(", ")} back to hand.`, "");
+        // When you camp, you may rearrange your line (bots use their usual best order)
+        if (p.bot && !action.order && !this.rules.gNoRearrange && p.line.length > 1) {
+          const ord = Bot.arrange(p.line.map(d => ({ dog: d, st: d.state }))).map(x => x.dog);
+          if (ord.length === p.line.length) action = { ...action, order: ord.map(d => d.id) };
+        }
+        if (action.order && action.order.length && !this.rules.gNoRearrange) {
+          const ord = action.order.map(id => p.line.find(d => d.id === id)).filter(Boolean);
+          const rest = p.line.filter(d => !ord.includes(d));
+          const next = [...ord, ...rest];
+          if (next.some((d, i) => d !== p.line[i])) { p.line = next; this.log(`${p.name} rearranges the gangline.`, ""); }
+        }
+      return action;
+    }
     // Can the team step onto the next trail right now?
     gNext(p, gearSel = []) {
       const nxt = p.pos + 1;
@@ -1506,7 +1537,7 @@ const LT = (() => {
       if ((this.rules.gAlpineFront ? line0.slice(0, 1) : line0).some(x => x.dog.ab === "ignore1" && (x.st === "rested" || (x.st !== "exh" && x.dog.tt)))) p.ignoreLeft = 1;
       p.shadowTurn = line0.some(x => x.st === "rested" && x.dog.ab === "shadow");
       if (this.rules.gTireAll) for (const d of p.line.slice(1)) this.gTire(d);
-      const start = p.pos; p._passed = new Set(); p._gRunning = true; p._pendRB = 0; p._pendCM = 0;
+      const start = p.pos; p._passed = new Set(); p._gRunning = true; p._gRunGear = gearSel; p._pendRB = 0; p._pendCM = 0;
       const bonus0 = p.runBonus, kept0 = p.keptEvents.length, cost0 = p.costMod;
       let moved = 0;
       const runEvents = [];
@@ -1535,7 +1566,7 @@ const LT = (() => {
         }
         if (n.tankOff) { for (const d of p.line.filter(d => d.ab === "heavy")) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; } this.log(`Tank won't go on River Ice and goes back to ${p.name}'s hand.`, ""); }
         p.pos = n.nxt; moved++;
-        if (moved === 1) gearSel = gearSel.filter(g => g.name !== "Snack"); // a Snack played at the start covers only the first trail
+        if (moved === 1) p._gRunGear = gearSel = gearSel.filter(g => g.name !== "Snack"); // a Snack played at the start covers only the first trail
         if (this.format === "gangline" && moved === 1) p.campedLast = false; // Night Runner: the bonus covers only the first trail after camping
         this.onMoveOnto(n.nxt);
         // Optional: overtaking on a narrow trail tangles the musher you pass
@@ -1581,7 +1612,7 @@ const LT = (() => {
       // Gangline: a Tailwind drawn during this Run has already helped it, so it is discarded now
       const fresh = p.keptEvents.slice(kept0), tw = fresh.filter(e => e === "Tailwind").length;
       p.runBonus -= bonus0 + tw; p.keptEvents = fresh.filter(e => e !== "Tailwind"); p.costMod -= cost0; p.campedLast = false;
-      p._gRunning = false; p.runBonus += p._pendRB || 0; p.costMod += p._pendCM || 0; p._pendRB = 0; p._pendCM = 0; // Northern Lights / Fresh Snow drawn on this Run now apply
+      p._gRunning = false; p._gRunGear = null; p.runBonus += p._pendRB || 0; p.costMod += p._pendCM || 0; p._pendRB = 0; p._pendCM = 0; // Northern Lights / Fresh Snow drawn on this Run now apply
       if (this.rules.gBrambleRested) { if (moved) for (const x of line0) if (x.st === "rested" && x.dog.ab === "bramble" && p.line.includes(x.dog) && x.dog.state !== "exh") { x.dog.state = this.rules.gBrambleTired ? "tired" : "exh"; this.log(`Bramble ran rested and is ${x.dog.state === "exh" ? "exhausted" : "tired"}.`, ""); } }
       else if (!this.rules.gBrambleExh) for (const x of line0) if (x.st === "tired" && x.dog.ab === "bramble" && p.dogs.includes(x.dog)) await this.dropDog(p, x.dog, "Bramble ran tired");
       if (line0.some(x => x.st === "rested" && x.dog.ab === "tinker") && p.used.length) {
@@ -1609,21 +1640,7 @@ const LT = (() => {
       const cocoaOnLine = p.line.some(d => d.ab === "cocoa" && d.state !== "exh"); // Cocoa works from the gangline, rested or tired
       p.gCampAllRested = p.line.length > 0 && p.line.every(d => d.state === "rested"); // for the stuck-team scratch
       for (const d of p.line) { if (d.state === "exh") d.state = "tired"; else if (d.state === "tired") d.state = "rested"; }
-      let back = (action.ret || []).map(id => p.line.find(d => d.id === id)).filter(Boolean);
-      if (back.length >= p.line.length) back = back.slice(0, p.line.length - 1); // at least one dog stays hitched
-      for (const d of back) { p.line.splice(p.line.indexOf(d), 1); d.state = "rested"; }
-      if (back.length) this.log(`${p.name} brings ${back.map(d => d.name).join(", ")} back to hand.`, "");
-      // When you camp, you may rearrange your line (bots use their usual best order)
-      if (p.bot && !action.order && !this.rules.gNoRearrange && p.line.length > 1) {
-        const ord = Bot.arrange(p.line.map(d => ({ dog: d, st: d.state }))).map(x => x.dog);
-        if (ord.length === p.line.length) action = { ...action, order: ord.map(d => d.id) };
-      }
-      if (action.order && action.order.length && !this.rules.gNoRearrange) {
-        const ord = action.order.map(id => p.line.find(d => d.id === id)).filter(Boolean);
-        const rest = p.line.filter(d => !ord.includes(d));
-        const next = [...ord, ...rest];
-        if (next.some((d, i) => d !== p.line[i])) { p.line = next; this.log(`${p.name} rearranges the gangline.`, ""); }
-      }
+      action = this.gArrange(p, action);
       const cocoa = cocoaOnLine;
       if (cocoa && p.used.length) {
         const id = await this.ask(p, { type: "tinker", options: p.used.map(g => g.id), source: "Cocoa" });
@@ -1709,7 +1726,7 @@ const LT = (() => {
       if (p.pos >= this.cpIdx[1] && action.type !== "cp") p.finalTurns = (p.finalTurns || 0) + 1;
       let quiet = null;
       if (action.type === "go") await this.gGo(p, action);
-      else if (action.type === "cp") { await this.doCampCP(p, !!action.long); quiet = "Checkpoint camp"; }
+      else if (action.type === "cp") { await this.doCampCP(p, !!action.long); if (!p.scratched) this.gArrange(p, action); quiet = "Checkpoint camp"; }
       else quiet = await this.gCamp(p, action);
       if (this.over || p.scratched) return;
       const atCP = p.pos >= 0 && this.path[p.pos].type === "CP";
@@ -2522,7 +2539,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 18, 11:53 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 20, 10:30 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3134,7 +3151,21 @@ function renderLog(full) {
 }
 
 // ---------------- Modals ----------------
-function modal(html) { $("#modal").innerHTML = `<div class="scrim"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`; }
+// Run and Event prompts sit in a corner without dimming the board, and show your Speed against the next trail
+const DOCK = new Set(["event", "pickEvent", "rookieIgnore", "giveEvent", "alpineIgnore", "gContinue", "gSnack", "sledBasket", "bivyEnd"]);
+function runInfo(p, r) {
+  const g = S.game; if (!g || !p || p.scratched) return "";
+  let sp, cost, label, extra = "";
+  if (r.type === "gContinue") { sp = r.speed; cost = r.cost; label = r.label; }
+  else if (r.type === "gSnack") { sp = r.speed - 2; cost = r.cost; label = r.label; extra = ` <span class="ok">(${r.speed} with a Snack)</span>`; }
+  else { const n = g.gNext(p, p._gRunGear || []); if (!n) return ""; sp = n.speed; cost = n.cost; label = g.label(n.nxt); }
+  const verdict = cost == null ? `<span class="muted">face-down</span>` : sp >= cost ? `<span class="ok">Speed covers it</span>` : `<span class="no">Not enough Speed</span>`;
+  return `<div class="runinfo"><span>${esc(p.name)}'s Speed <b>${sp}</b>${extra}</span><span>Next: ${esc(label)} · Difficulty <b>${cost == null ? "?" : cost}</b></span>${verdict}</div>`;
+}
+function modal(html) {
+  const pd = S.pending, dock = !S.overlay && pd && !pd.p.bot && isG() && DOCK.has(pd.req.type);
+  $("#modal").innerHTML = `<div class="scrim${dock ? " dock" : ""}"><div class="modal" role="dialog" aria-modal="true">${dock ? runInfo(pd.p, pd.req) : ""}${html}</div></div>`;
+}
 function renderModal() {
   const m = $("#modal"); if (!m) return;
   const g = S.game, ov = S.overlay, pd = S.pending;
@@ -3614,7 +3645,7 @@ document.addEventListener("click", e => {
     case "go": if (S.run && pd) resolvePending({ type: "run", line: S.run.line.map(x => ({ id: x })), gear: [...S.run.gear] }); break;
     case "slog": if (pd) { const c = $("#uselantern"); resolvePending({ type: "slog", lantern: c ? c.checked : false }); } break;
     case "camp": if (pd) { const c = $("#usebivy"); resolvePending({ type: "camp", bivy: c ? c.checked : false }); } break;
-    case "cpcamp": if (pd) { S.g = null; resolvePending({ type: "cp", long: false }); } break;
+    case "cpcamp": if (pd) { const st = isG() ? gState() : { ret: new Set() }; S.g = null; resolvePending({ type: "cp", long: false, ret: [...st.ret], order: st.order || [] }); } break;
     case "sheet": { document.documentElement.classList.toggle("sheet"); document.documentElement.classList.remove("logsheet"); buildMobileBar(); break; }
     case "logsheet": { const on = document.documentElement.classList.toggle("logsheet"); document.documentElement.classList.remove("sheet"); const lw = $("#logwrap"); if (on && lw) lw.open = true; buildMobileBar(); break; }
     case "gsel": { const st = gState(); st.sel = st.sel === id ? null : id; renderGame(); break; }
@@ -3626,7 +3657,7 @@ document.addEventListener("click", e => {
     case "gret": { const st = gState(); if (st.ret.has(id)) st.ret.delete(id); else st.ret.add(id); renderGame(); break; }
     case "ggo": if (pd) { const st = gState(); S.g = null; resolvePending({ type: "go", gear: [...st.gear] }); } break;
     case "gcamp": if (pd) { const st = gState(); const c = $("#usebivy"); S.g = null; resolvePending({ type: "camp", ret: [...st.ret], bivy: c ? c.checked : false, order: st.order || [] }); } break;
-    case "longrest": if (pd) { S.g = null; resolvePending({ type: "cp", long: true }); } break;
+    case "longrest": if (pd) { const st = isG() ? gState() : { ret: new Set() }; S.g = null; resolvePending({ type: "cp", long: true, ret: [...st.ret], order: st.order || [] }); } break;
     case "usegear": if (pd) {
       if (S.overlay && S.overlay.type === "zoom") S.overlay = null;
       if (S.run) S.keepRun = { line: S.run.line.slice(), gear: new Set(S.run.gear) };
@@ -3686,7 +3717,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 18, 11:53 AM";
+const LT_BUILD = "Oct 20, 10:30 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
