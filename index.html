@@ -2252,7 +2252,7 @@ const G_PRINTED = { finish: 3, cpDogs: 1 };
 const useGArt = () => isG() && ART_G.count > 0 && !String(ART.source || "").startsWith("your");
 const gArt = keys => useGArt() ? artFor(keys, ART_G) : null;
 // Gangline card images printed before their text changed: show text until new images arrive
-const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind", "Snack", "Willow", "Ember", "Echo", "Dash", "Bear", "Brick", "Old Ben"]);
+const G_ART_STALE = new Set(["Bivy Sack", "Veteran", "Night Runner", "Tailwind", "Snack", "Willow", "Ember", "Echo", "Dash", "Bear", "Brick", "Old Ben", "Bramble", "Kestrel", "Flash", "Tank"]);
 function setArt(entries, source) {
   for (const u of ART.files.values()) if (u.startsWith("blob:")) URL.revokeObjectURL(u);
   ART.files = new Map(); ART.source = source;
