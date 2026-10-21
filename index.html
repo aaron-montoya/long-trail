@@ -2699,7 +2699,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 21, 9:14 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 21, 9:18 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -3044,9 +3044,38 @@ function renderGBoard(p, myTurn) {
       <div class="label">Your hand · ${hand.length} dog${hand.length === 1 ? "" : "s"}, ${p.gear.length} gear${canHitch ? `<span class="lg-long"> · tap a dog to hitch it</span>` : ""}</div>
       <div class="hand" id="hand">${items.join("") || `<span class="empty">Your hand is empty.</span>`}</div>
     </div>`;
-  if (!myTurn) rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`;
+  const rpd = S.pending;
+  if (rpd && !rpd.p.bot && rpd.p === p && RUN_PROMPTS.has(rpd.req.type)) rp.innerHTML = gRunPromptHTML(p, rpd.req);
+  else if (!myTurn) rp.innerHTML = `<div class="waiting" style="padding:8px">${g.current ? `<b style="color:${g.current.color}">${esc(g.current.name)}</b> is taking their turn…` : ""}</div>`;
   else rp.innerHTML = gActionsHTML(p, st);
   if (typeof fitCards === "function") requestAnimationFrame(fitCards);
+}
+// Mid-Run choices use the same panel as starting your turn: Speed against the next trail, then the choices
+const RUN_PROMPTS = new Set(["gContinue", "gSnack", "gBoost"]);
+function gRunPromptHTML(p, r) {
+  const g = S.game, gear = p._gRunGear || [];
+  const sp = g.gSpeed(p, gear), c = g.path[r.next], here = g.label(p.pos);
+  const btn = (v, title, sub, o = {}) => `<button class="act ${o.primary ? "primary" : ""}" data-act="pick" data-v="${v}"><b>${title}</b><span>${sub}</span></button>`;
+  const tires = g.rules.gPattern ? `it tires ${esc(fNames(p, c))}` : "your first 2 dogs that aren't exhausted tire";
+  const ev = c && c.type === "T" ? ", then you draw an Event" : "";
+  const stopSub = `End your Run at ${esc(here)}.${g.path[p.pos] && g.path[p.pos].reward ? " Take its reward." : ""}`;
+  let h = `<h3>${r.type === "gBoost" ? "Not enough Speed" : "Keep going?"}</h3><div class="small">On your Run · at ${esc(here)}</div>`;
+  h += `<div class="gspeed"><div><span class="small">Team Speed</span> <b class="big ${r.type === "gBoost" ? "short" : ""}">${sp.total}</b></div><div><span class="small">${esc(r.label)}</span> <b class="big">${r.cost}</b></div></div>`;
+  h += `<div class="small">${sp.parts.map(([w, v]) => `${esc(w)} ${v >= 0 ? "+" : ""}${v}`).join(" · ") || "No dogs running."}</div>`;
+  if (r.type === "gContinue" && g.gStepSpends(p) && c && c.type === "T") h += `<div class="small" style="color:var(--bad);margin-top:6px"><b>Danger:</b> this step exhausts your whole team. End your turn on a trail like that and you're scratched.</div>`;
+  h += `<div class="acts" style="margin-top:10px">`;
+  if (r.type === "gContinue") {
+    h += btn("1", "Keep going", `Move onto ${esc(r.label)}: ${tires}${ev}.`, { primary: true });
+    if (r.canBoot) h += btn("2", "Keep going with Booties", `Move onto ${esc(r.label)}. Your dogs don't tire for it${ev}.`);
+    h += btn("0", "Stop here", stopSub);
+  } else if (r.type === "gSnack") {
+    h += btn("1", "Use a Snack and keep going", `+2 Speed for ${esc(r.label)} (${r.speed} with the Snack). Then ${tires}${ev}.`, { primary: true });
+    h += btn("0", "Stop here", stopSub);
+  } else {
+    h += r.options.map((o, i) => btn(String(i), esc(o.label.split(":")[0]), esc(o.label.split(":").slice(1).join(":").trim()) + (o.helps ? ` · <b>gets you onto ${esc(r.label)}</b>` : ""), { primary: o.helps })).join("");
+    h += btn("", "End my Run", stopSub);
+  }
+  return h + `</div>`;
 }
 function gActionsHTML(p, st) {
   const g = S.game, pd = S.pending, noGo = !!(pd && pd.req.noGo);
@@ -3334,7 +3363,7 @@ function renderLog(full) {
 
 // ---------------- Modals ----------------
 // Run and Event prompts sit in a corner without dimming the board, and show your Speed against the next trail
-const DOCK = new Set(["event", "pickEvent", "rookieIgnore", "giveEvent", "alpineIgnore", "gContinue", "gSnack", "gBoost", "runEnd", "sledBasket", "bivyEnd"]);
+const DOCK = new Set(["event", "pickEvent", "rookieIgnore", "giveEvent", "alpineIgnore", "gContinue", "gSnack", "gBoost", "runEnd", "sledBasket", "bivyEnd", "removeDog", "exhaustDog"]);
 function runInfo(p, r) {
   const g = S.game; if (!g || !p || p.scratched) return "";
   let sp, cost, label, extra = "";
@@ -3376,7 +3405,7 @@ function renderModal() {
     if (ov.type === "artcheck") return modal(ov.html);
     if (ov.type === "zoom") return modal(zoomHTML(ov.spec) + `<div class="btns" style="margin-top:12px"><button class="primary" data-act="closezoom">Close</button></div>`);
   }
-  if (!pd || pd.p.bot || pd.req.type === "action") { m.innerHTML = ""; return; }
+  if (!pd || pd.p.bot || pd.req.type === "action" || (isG() && RUN_PROMPTS.has(pd.req.type))) { m.innerHTML = ""; return; }
   const r = pd.req, p = pd.p;
   const findDog = id => p.dogs.find(d => d.id === id) || (r.cards || []).find(d => d.id === id);
   switch (r.type) {
@@ -3535,6 +3564,7 @@ function rulesHTML() {
     <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. ${g && g.rules.gPattern ? "Each trail shows 4 dots laid out like a gangline (slot 1 is the front). The dogs in the lit slots each tire one step (rested → tired → exhausted); an empty slot or an exhausted dog is skipped. Snowfield 1 &amp; 2 · Spruce Forest 2 &amp; 3 · Mountain Pass 3 &amp; 4 · River Ice 1 &amp; 4 · Exposed Ridge 1 &amp; 3 · Deep Powder 1, 2 &amp; 3 · Starting Chute and checkpoints 1 &amp; 2. Then you" : "Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted), then you"} <b>draw an Event</b> for that trail. Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. If an Event moves you back, your Run ends. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested), then <b>draw an Event</b>. You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
     <li><b>Events:</b> one for each trail you move onto, and one when you camp in the open. Never at a checkpoint: moving onto or camping at a checkpoint is free. No Events before Checkpoint 1.${((g ? g.rules.gGiveAhead : S.gGive)) ? " <b>Give it to the leader:</b> when you draw an Event and another musher is leading the race on a trail, you may give it to them instead. They resolve it." : ""}</li>
+    <li><b>Gear:</b> gear that doesn't say when can be played any time on your turn, even mid-Run. "This Run" gear can be played when you start a Run or when your Speed falls short of the next trail. Copies of the same gear stack.</li>
     <li><b>Drafting:</b> a trail another musher is on or has passed is 1 less Difficulty for you (Deep Powder: 3 less). The leader breaks trail and takes the weather; everyone behind follows their tracks.</li>
     <li><b>Scratched:</b> you're out of the race if, at the end of your turn, your gangline is empty, or you're on a trail and every dog in your gangline is exhausted. Dogs in your hand don't count. Checkpoints are safe from that. You're also scratched if you camp in the open when every dog in your gangline is already rested, you have no dogs in your hand, and your Speed still can't cover the next trail.</li></ul></details>
   <details class="rules"><summary>Speed</summary><ul>
@@ -3706,11 +3736,18 @@ function scrollStripToAction() {
 // Phone: a bar pinned to the bottom with the turn buttons, or need/have + Run! while setting up a Run.
 function buildMobileBar() {
   const bar = $("#mobilebar"); if (!bar) return;
-  const pd = S.pending, myTurn = pd && pd.req.type === "action" && !pd.p.bot;
+  const pd = S.pending, runP = pd && !pd.p.bot && S.game && S.game.format === "gangline" && RUN_PROMPTS.has(pd.req.type), myTurn = pd && !pd.p.bot && (pd.req.type === "action" || runP);
   const setBarH = () => document.documentElement.style.setProperty("--barh", (bar.hidden ? 0 : bar.offsetHeight) + "px");
   if (!isNarrow() || !myTurn) { bar.hidden = true; document.body.classList.remove("hasbar"); document.documentElement.classList.remove("sheet"); setBarH(); return; }
   let html = "";
-  if (S.game && S.game.format === "gangline") {
+  if (runP) {
+    const g = S.game, p = pd.p, r = pd.req, sp = g.gSpeed(p, p._gRunGear || []);
+    const open = document.documentElement.classList.contains("sheet");
+    html = `<div class="mbspeed" title="${esc(r.label)}"><span>Speed <b class="${sp.total >= r.cost ? "ok" : "short"}">${sp.total}</b></span><span>next needs <b>${r.cost}</b></span></div>`;
+    const btns = [...document.querySelectorAll("#runpanel .acts > button.act")];
+    html += btns.slice(0, 3).map(b => `<button class="${b.classList.contains("primary") ? "primary" : ""}" data-act="pick" data-v="${b.dataset.v}">${esc(b.querySelector("b").textContent.replace(/^Keep going with Booties$/, "Booties").replace(/^Use a Snack and keep going$/, "Snack"))}</button>`).join("");
+    html += `<button class="mbdetails" data-act="sheet" aria-label="${open ? "Close details" : "Turn details"}">${open ? "✕" : "⋯"}</button>`;
+  } else if (S.game && S.game.format === "gangline") {
     const g = S.game, p = pd.p, st = gState();
     const gearSel = [...st.gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
     const sp = g.gSpeed(p, gearSel), n = g.gNext(p, gearSel);
@@ -3912,7 +3949,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 21, 9:14 AM";
+const LT_BUILD = "Oct 21, 9:18 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
