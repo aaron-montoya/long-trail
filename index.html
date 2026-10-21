@@ -497,6 +497,8 @@ html.phone .scrim.dock .modal .cards .card { --w: 72px; }
 .gspeed .big { font-size: 26px; }
 .row2 { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .swaps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.modal .boosts { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.modal .boosts button { text-align: left; }
 .swaps button { font-size: 13px; padding: 5px 9px; }
 .chipbtn { font-size: 12px; padding: 3px 9px; border-radius: 12px; }
 .chipbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -696,9 +698,9 @@ const LT = (() => {
     "Echo": ["+3 while Echo is second in your gangline.", "", 2, 2, "pEc"],
     "Dash": ["+3 while Dash is at the back of your gangline.", "", 2, 1, "pD"],
     "Bear": ["+3 if the dog directly behind Bear is rested.", "", 2, 2, "pB2"],
-    "Bramble": ["+3 if Bramble is directly behind a tired dog.", "", 2, 2, "pBram"],
+    "Bramble": ["+3 if Bramble is directly behind a tired dog.", "", 3, 2, "pBram"],
     "Kestrel": ["When Kestrel runs, Snowfield has 1 less Difficulty.", "", 3, 1],
-    "Flash": ["", "If an Event drops a dog while Flash is tired, drop Flash.", 3, 3],
+    "Flash": ["", "If an Event drops a dog while Flash is tired, drop Flash.", 3, 1],
     "Tank": ["As your team moves onto River Ice, put Tank in your hand.", "As your team moves onto River Ice, put Tank in your hand.", 3, 3],
   };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
@@ -966,7 +968,7 @@ const LT = (() => {
       cost += p.costMod;
       cost = Math.max(1, cost);
       if (gearSel.some(g => g.name === "Wax the Runners")) cost = Math.max(1, cost - 1);
-      if (gearSel.some(g => g.name === "Snow Hook") && (c.name === "Mountain Pass" || c.name === "Deep Powder")) cost = Math.max(1, cost - 2);
+      if (c.name === "Mountain Pass" || c.name === "Deep Powder") { const hooks = gearSel.filter(g => g.name === "Snow Hook").length; if (hooks) cost = Math.max(1, cost - 2 * (this.format === "gangline" ? hooks : 1)); } // Gangline: Snow Hooks stack
       return cost;
     }
     cpCost() { return this.rules.cpCost == null ? 1 : this.rules.cpCost; }
@@ -1548,6 +1550,32 @@ const LT = (() => {
       const targets = this.gPatternTargets(p, c).slice(0, max);
       for (const d of targets) if (p.line.includes(d)) await this.gTireDog(p, d, c.name || "the trail");
     }
+    // Gear you could play mid-Run to reach the next trail
+    gBoostOptions(p, gearSel, snackNow) {
+      const base = [...gearSel, ...snackNow], out = [];
+      const okWith = sel => { const n = this.gNext(p, sel); return !!(n && n.ok); };
+      const okAfter = fn => { const save = p.line.map(d => d.state); fn(); const r = okWith(base); p.line.forEach((d, i) => d.state = save[i]); return r; };
+      const seen = new Set();
+      for (const g of p.gear) {
+        if (seen.has(g.name + "|")) continue;
+        if (g.name === "Snack") { seen.add("Snack|"); out.push({ gid: g.id, name: g.name, label: "Snack: +2 Speed for this trail", helps: okWith([...base, g]) }); }
+        else if (["Snow Hook", "Wax the Runners", "Golden Harness"].includes(g.name)) { seen.add(g.name + "|"); out.push({ gid: g.id, name: g.name, label: `${g.name}: for the rest of this Run`, helps: okWith([...base, g]) }); }
+        else if (g.name === "Hot Broth" && p.line.some(d => d.state === "tired")) { seen.add("Hot Broth|"); out.push({ gid: g.id, name: g.name, label: "Hot Broth: all tired dogs become rested", helps: okAfter(() => p.line.forEach(d => { if (d.state === "tired") d.state = "rested"; })) }); }
+        else if (g.name === "Whistle" && !seen.has("Whistle")) { seen.add("Whistle"); for (const d of p.line.filter(d => d.state === "tired")) out.push({ gid: g.id, name: g.name, target: d.id, label: `Whistle: ${d.name} becomes rested`, helps: okAfter(() => { d.state = "rested"; }) }); }
+        else if (g.name === "Dog Food" && !seen.has("Dog Food")) { seen.add("Dog Food"); for (const d of p.line.filter(d => d.state !== "rested")) out.push({ gid: g.id, name: g.name, target: d.id, label: `Dog Food: ${d.name} becomes ${d.state === "exh" ? "tired" : "rested"}`, helps: okAfter(() => { d.state = d.state === "exh" ? "tired" : "rested"; }) }); }
+      }
+      return out;
+    }
+    async gApplyBoost(p, o, gearSel, snackNow) {
+      const g = p.gear.find(x => x.id === o.gid);
+      if (!g) return;
+      if (g.name === "Snack" || ["Snow Hook", "Wax the Runners", "Golden Harness"].includes(g.name)) {
+        p.gear.splice(p.gear.indexOf(g), 1); p.used.push(g);
+        if (g.name === "Snack") snackNow.push(g); else gearSel.push(g);
+        this.log(`${p.name} plays ${g.name} mid-Run.`, "good");
+      } else await this.useFreeGear(p, g.id, o.target);
+      this.upd();
+    }
     gCanSwap(p) { return !!this.rules.gSwap && (p.hitchN || 0) < this.gHitchLimit(p) && p.line.length >= 2; }
     gSwap(p, i) {
       if (!this.gCanSwap(p) || i < 0 || i >= p.line.length - 1) return;
@@ -1623,22 +1651,31 @@ const LT = (() => {
       const runEvents = [];
       this.log(`${p.name} sets off: Speed ${this.gSpeed(p, gearSel).total}${gearSel.length ? " with " + gearSel.map(g => g.name).join(", ") : ""}.`, "act");
       while (!this.over && !p.scratched) {
-        let n = this.gNext(p, gearSel), snackNow = false;
-        // Snack: +2 Speed for one trail. Played mid-Run when it's what gets you onto the next trail.
-        if (moved > 0 && n && !n.ok && !this.over) {
-          const sc = p.gear.find(g => g.name === "Snack");
-          const n2 = sc && this.gNext(p, [...gearSel, sc]);
-          if (n2 && n2.ok && await this.ask(p, { type: "gSnack", speed: n2.speed, cost: n2.cost, next: n2.nxt, label: this.label(n2.nxt) })) {
-            p.gear.splice(p.gear.indexOf(sc), 1); p.used.push(sc); n = n2; snackNow = true;
-            this.log(`${p.name} hands out a Snack: +2 Speed for ${this.label(n2.nxt)}.`, "good");
+        const snackNow = []; let boosted = false, offered = false;
+        let n = this.gNext(p, gearSel);
+        // Gangline: when your Speed falls short of the next trail mid-Run, you may play gear to reach it
+        if (moved > 0 && n && !n.ok && !n.blocked && !this.over) {
+          for (let guard = 0; guard < 8; guard++) {
+            const opts = this.gBoostOptions(p, gearSel, snackNow);
+            if (!opts.length) break;
+            offered = true;
+            const pick = await this.ask(p, { type: "gBoost", speed: n.speed, cost: n.cost, next: n.nxt, label: this.label(n.nxt), options: opts.map(o => ({ label: o.label, helps: o.helps, gid: o.gid })) });
+            if (pick == null || pick === false || pick === "" || !opts[+pick]) break;
+            await this.gApplyBoost(p, opts[+pick], gearSel, snackNow);
+            p._gRunGear = gearSel;
+            n = this.gNext(p, [...gearSel, ...snackNow]);
+            if (n && n.ok) { boosted = true; break; }
           }
         }
-        if (!n || !n.ok) break;
+        if (!n || !n.ok) {
+          if (moved > 0 && n && !offered && !this.over && !p.scratched) await this.tell(p, { type: "runEnd", here: this.label(p.pos), label: this.label(n.nxt), speed: n.speed, cost: n.cost, blocked: !!n.blocked, hidden: !!n.hidden });
+          break;
+        }
         if (this.rules.gMaxSteps && moved >= this.rules.gMaxSteps) break;
         // Booties: your dogs don't tire for one trail. Played at the start of a Run it covers the first trail;
         // you may also play one from your hand on any later trail of the Run.
         let bootThis = moved === 0 && booties;
-        if (moved > 0 && !snackNow) {
+        if (moved > 0 && !boosted) {
           const bootCard = p.gear.find(g => g.name === "Booties");
           const go = await this.ask(p, { type: "gContinue", speed: n.speed, cost: n.cost, next: n.nxt, label: this.label(n.nxt), canBoot: !!bootCard });
           if (!go) break;
@@ -2012,7 +2049,7 @@ const LT = (() => {
       let sel = [], best = Bot.est(g, p, line, sel);
       const cands = p.gear.filter(x => x.when === "run" && x.name !== "Booties");
       for (const c of cands) {
-        if (sel.some(s => s.name === c.name) && c.name !== "Snack") continue;
+        if (sel.some(s => s.name === c.name) && c.name !== "Snack" && !(c.name === "Snow Hook" && g.format === "gangline")) continue;
         const v = Bot.est(g, p, line, [...sel, c]);
         if (v > best) { best = v; sel = [...sel, c]; }
       }
@@ -2155,6 +2192,7 @@ const LT = (() => {
         case "trapSwap": { const w = p.line.find(d => d.state === "exh"); return w ? w.id : ""; }
         case "bivyEnd": return p.line.some(d => d.state === "exh") || p.line.filter(d => d.state === "tired").length >= 2;
         case "gSnack": return Bot.answer(g, p, { ...req, type: "gContinue", canBoot: false }) !== false;
+        case "gBoost": { if (Bot.answer(g, p, { ...req, type: "gContinue", canBoot: false }) === false) return null; const i = req.options.findIndex(o => o.helps); return i >= 0 ? i : null; }
         case "gContinue": {
           const f = p.line[0];
           const live = p.line.filter(d => d.state !== "exh").length;
@@ -2661,7 +2699,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 21, 8:48 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 21, 9:14 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2856,6 +2894,7 @@ function gProjection() {
   if (!isG() || !pd || pd.p.bot || pd.p.scratched) return null;
   const p = pd.p, r = pd.req;
   if (r.type === "gContinue" || r.type === "gSnack") return { pos: r.next, ok: true };
+  if (r.type === "gBoost") return { pos: r.next, ok: false };
   let gear;
   if (r.type === "action") gear = [...gState().gear].map(id => p.gear.find(x => x.id === id)).filter(Boolean);
   else if (p._gRunning && DOCK.has(r.type)) gear = p._gRunGear || [];
@@ -3295,11 +3334,11 @@ function renderLog(full) {
 
 // ---------------- Modals ----------------
 // Run and Event prompts sit in a corner without dimming the board, and show your Speed against the next trail
-const DOCK = new Set(["event", "pickEvent", "rookieIgnore", "giveEvent", "alpineIgnore", "gContinue", "gSnack", "sledBasket", "bivyEnd"]);
+const DOCK = new Set(["event", "pickEvent", "rookieIgnore", "giveEvent", "alpineIgnore", "gContinue", "gSnack", "gBoost", "runEnd", "sledBasket", "bivyEnd"]);
 function runInfo(p, r) {
   const g = S.game; if (!g || !p || p.scratched) return "";
   let sp, cost, label, extra = "";
-  if (r.type === "gContinue") { sp = r.speed; cost = r.cost; label = r.label; }
+  if (r.type === "gContinue" || r.type === "gBoost" || r.type === "runEnd") { sp = r.speed; cost = r.cost; label = r.label; }
   else if (r.type === "gSnack") { sp = r.speed - 2; cost = r.cost; label = r.label; extra = ` <span class="ok">(${r.speed} with a Snack)</span>`; }
   else { const n = g.gNext(p, p._gRunGear || []); if (!n) return ""; sp = n.speed; cost = n.cost; label = g.label(n.nxt); }
   const verdict = cost == null ? `<span class="muted">face-down</span>` : sp >= cost ? `<span class="ok">Speed covers it</span>` : `<span class="no">Not enough Speed</span>`;
@@ -3379,6 +3418,15 @@ function renderModal() {
         <p class="small">If you keep going, ${g.rules.gPattern ? `${esc(g.label(r.next))} tires ${esc(fNames(p, g.path[r.next]))}` : "your first 2 dogs that aren't exhausted tire"}${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
         ${g.gStepSpends(p) && g.path[r.next] && g.path[r.next].type === "T" ? `<p class="small" style="color:var(--bad)"><b>Danger:</b> this step exhausts your whole team. End your turn on a trail like that and you're scratched.</p>` : ""}
         <div class="btns"><button data-act="pick" data-v="0">Stop here</button>${r.canBoot ? `<button data-act="pick" data-v="2">Keep going with Booties (no tiring)</button>` : ""}<button class="primary" data-act="pick" data-v="1">Keep going</button></div>`);
+    case "gBoost":
+      return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Not enough Speed for ${esc(r.label)}</h3>
+        <p>${esc(r.label)} needs <b>${r.cost}</b> Speed and your team has <b>${r.speed}</b>. Play gear to keep going, or end your Run here.</p>
+        <div class="boosts">${r.options.map((o, i) => `<button data-act="pick" data-v="${i}" class="${o.helps ? "primary" : ""}">${esc(o.label)}${o.helps ? " · gets you there" : ""}</button>`).join("")}</div>
+        <div class="btns"><button data-act="pick" data-v="">End my Run</button></div>`);
+    case "runEnd":
+      return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Your Run ends at ${esc(r.here)}</h3>
+        <p>${r.blocked ? `Tank won't go onto ${esc(r.label)}.` : `${esc(r.label)} needs <b>${r.cost == null ? "?" : r.cost}</b> Speed and your team has <b>${r.speed}</b>. You have no gear that could help.`}</p>
+        <div class="btns"><button class="primary" data-act="ok">OK</button></div>`);
     case "gSnack": {
       const sc = p.gear.find(x => x.name === "Snack");
       return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Eat a Snack to keep going?</h3><div class="cards">${sc ? gearCard(sc) : ""}</div>
@@ -3822,6 +3870,7 @@ document.addEventListener("click", e => {
       const v = b.dataset.v, t = pd.req.type;
       if (t === "pickEvent") resolvePending(+v);
       else if (t === "rookieIgnore" || t === "sledBasket" || t === "stopAtCP" || t === "alpineIgnore" || t === "bivyEnd" || t === "gSnack") resolvePending(v === "1");
+      else if (t === "gBoost") resolvePending(v === "" ? null : +v);
       else if (t === "gContinue") resolvePending(v === "2" ? "boot" : v === "1");
       else if (t === "giveEvent") resolvePending(v === "" ? null : +v);
       else resolvePending(v);
@@ -3863,7 +3912,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 21, 8:48 AM";
+const LT_BUILD = "Oct 21, 9:14 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
