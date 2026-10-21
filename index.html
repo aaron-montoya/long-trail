@@ -97,6 +97,11 @@ button.ghost { background: transparent; }
 .slot.proj .card { outline: 3px dashed var(--hl); outline-offset: 2px; }
 .slot.projend .card { outline: 3px solid var(--hl); outline-offset: 2px; }
 .slot.projno .card { outline: 3px dashed var(--bad); outline-offset: 2px; }
+.card .fdots { position: absolute; left: 6%; top: 22%; width: calc(var(--w) * .27); height: calc(var(--w) * .4); background: rgb(18 26 34 / .82); border-radius: calc(var(--w) * .05); z-index: 3; box-shadow: 0 1px 3px rgb(0 0 0 / .4); pointer-events: none; }
+.card .fdots i { position: absolute; width: calc(var(--w) * .085); aspect-ratio: 1; border-radius: 50%; border: 1.5px solid rgb(255 255 255 / .55); box-sizing: border-box; left: calc(14% + var(--col) * 42%); top: calc(7% + var(--row) * 22%); }
+.card .fdots i.on { background: #f2b632; border-color: #f2b632; }
+.gslot.fhit .card { outline: 3px dashed #e07b2a; outline-offset: 2px; }
+.gslot .fhittag { position: absolute; left: 50%; transform: translateX(-50%); bottom: -9px; z-index: 4; font-size: 11px; font-weight: 700; background: #e07b2a; color: #fff; border-radius: 6px; padding: 1px 5px; }
 .slot .rewmini { --w: calc(var(--stripw) * .7); margin-top: -2px; }
 .board .card { --w: var(--handw); }
 [data-zoom] { cursor: zoom-in; }
@@ -491,6 +496,8 @@ html.phone .scrim.dock .modal .cards .card { --w: 72px; }
 .gspeed { display: flex; gap: 18px; align-items: baseline; margin: 8px 0 2px; }
 .gspeed .big { font-size: 26px; }
 .row2 { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.swaps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.swaps button { font-size: 13px; padding: 5px 9px; }
 .chipbtn { font-size: 12px; padding: 3px 9px; border-radius: 12px; }
 .chipbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .panel.resume p { margin: 4px 0 8px; }
@@ -679,6 +686,21 @@ const LT = (() => {
     gearCount: { "Headlamp": 2, "Dog Food": 4 }, // Gangline copies that differ from Classic
   };
   const G_START = { name: "Starting Chute", cost: 2 };
+  // Gangline fatigue patterns: which gangline slots (1 = front) tire when you move onto each trail
+  const G_FATIGUE = { "Snowfield": [1, 2], "Spruce Forest": [2, 3], "Mountain Pass": [3, 4], "River Ice": [1, 4], "Exposed Ridge": [1, 3], "Deep Powder": [1, 2, 3] };
+  const G_FATIGUE_DEFAULT = [1, 2]; // Starting Chute and checkpoints
+  // Gangline flattened dogs: no dog runs faster than 3 rested; power moves into position
+  // [rested text, tired text, rested Speed, tired Speed, ability]
+  const G_FLAT = {
+    "Willow": ["+3 if the dog directly behind Willow is a Team dog.", "", 1, 3, "pW"],
+    "Echo": ["+3 while Echo is second in your gangline.", "", 2, 2, "pEc"],
+    "Dash": ["+3 while Dash is at the back of your gangline.", "", 2, 1, "pD"],
+    "Bear": ["+3 if the dog directly behind Bear is rested.", "", 2, 2, "pB2"],
+    "Bramble": ["+3 if Bramble is directly behind a tired dog.", "", 2, 2, "pBram"],
+    "Kestrel": ["When Kestrel runs, Snowfield has 1 less Difficulty.", "", 3, 1],
+    "Flash": ["", "If an Event drops a dog while Flash is tired, drop Flash.", 3, 3],
+    "Tank": ["As your team moves onto River Ice, put Tank in your hand.", "As your team moves onto River Ice, put Tank in your hand.", 3, 3],
+  };
   const G_EVENT_TEXT = Object.fromEntries(G_EVENTS.map(e => [e[0], e[2]]));
   const HARSH = {
     "Northern Lights": 0, "Tailwind": 0, "Clear Skies": 1, "Fresh Snow": 3, "Lost Bootie": 3, "Sore Paws": 4,
@@ -724,7 +746,10 @@ const LT = (() => {
       this.format = opts.format === "gangline" ? "gangline" : "classic";
       this.rules = Object.assign({}, opts.rules || {});
       if (this.format === "gangline") {
-        if (this.rules.gTire2 === undefined) this.rules.gTire2 = true; // the front 2 dogs tire each step
+        if (this.rules.gTire2 === undefined) this.rules.gTire2 = true; // the front 2 dogs tire each step (when fatigue patterns are off)
+        if (this.rules.gPattern === undefined) this.rules.gPattern = true; // Gangline standard: each trail tires the gangline slots shown on it
+        if (this.rules.gSwap === undefined) this.rules.gSwap = true; // Gangline standard: Hitch, or swap two dogs next to each other
+        if (this.rules.gFlat === undefined) this.rules.gFlat = true; // Gangline standard: flattened dogs (rested Speed 3 at most)
         // a spent team on a trail is scratched (checkpoints are safe)
         if (this.rules.gScratchExh === undefined) { this.rules.gScratchExh = "line"; this.rules.gScratchNoCP = true; }
         if (this.rules.gTankAuto === undefined) this.rules.gTankAuto = true; // Tank steps off the line before River Ice
@@ -769,7 +794,8 @@ const LT = (() => {
       this.gearDeck = this.shuffle(GEAR.flatMap(g => Array.from({ length: this.format === "gangline" && G_ALT.gearCount[g[0]] != null ? G_ALT.gearCount[g[0]] : g[1] }, () => ({ id: nid("g"), name: g[0], when: g[2], text: g[3] }))));
       if (this.format === "gangline") {
         this.gearDeck = this.gearDeck.filter(g => !G_ALT.noGear.includes(g.name));
-        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; if (a[2] != null) d.rs = a[2]; if (a[3] != null) d.ts = a[3]; if (a[4] !== undefined) d.ab = a[4]; d.gAlt = true; } }
+        for (const d of this.dogDeck) { const a = G_ALT.dog[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; if (a[2] != null) d.rs = a[2]; if (a[3] != null) d.ts = a[3]; if (a[4] !== undefined) d.ab = a[4]; d.gAlt = true; }
+        if (this.rules.gFlat) for (const d of this.dogDeck) { const a = G_FLAT[d.name]; if (a) { d.text = a[0]; d.tt = a[1]; d.rs = a[2]; d.ts = a[3]; if (a[4] !== undefined) d.ab = a[4]; d.gAlt = true; } } }
         for (const g of this.gearDeck) { const a = G_ALT.gear[g.name]; if (a) { g.text = a; g.gAlt = true; } }
       }
       this.eventDeck = this.shuffle((this.format === "gangline" ? G_EVENTS : EVENTS).flatMap(e => Array.from({ length: opts.eventCounts && opts.eventCounts[e[0]] != null ? opts.eventCounts[e[0]] : e[1] }, () => e[0])));
@@ -898,10 +924,13 @@ const LT = (() => {
         if (i === 1 && line[0].st === "rested" && line[0].dog.ab === "birch") v += 2;
         if (d.ab === "aurora" && p.pos >= 0 && this.finalLeg(p.pos)) v += 2;
         // Gangline position dogs
-        if (d.ab === "pW" && line[i + 1] && line[i + 1].dog.role === "Team") v += 2;
+        const pb = this.rules.gFlat ? 3 : 2;
+        if (d.ab === "pW" && line[i + 1] && line[i + 1].dog.role === "Team") v += pb;
         if (d.ab === "pE") v += [line[i - 1], line[i + 1]].filter(y => y && y.st === "rested").length;
-        if (d.ab === "pEc" && i === 1) v += 2;
-        if (d.ab === "pD" && i === line.length - 1 && line.length > 1) v += 2;
+        if (d.ab === "pEc" && i === 1) v += pb;
+        if (d.ab === "pD" && i === line.length - 1 && line.length > 1) v += pb;
+        if (d.ab === "pB2" && line[i + 1] && line[i + 1].st === "rested") v += 3;
+        if (d.ab === "pBram" && line[i - 1] && line[i - 1].st === "tired") v += 3;
         if (d.ab === "pB" && line[i - 1] && line[i - 1].st === "tired") v += 2;
         if (d.ab === "pBr") v += line.slice(0, i).filter(y => y.st === "tired").length;
         add(v, d.name);
@@ -1501,7 +1530,40 @@ const LT = (() => {
       return { nxt, c, speed: sp, cost, ok: !blocked && sp >= cost, blocked };
     }
     // Would one more step leave every dog in the line exhausted?
+    // Fatigue pattern of a trail (gangline slots, 1 = front), or null when the front 2 tire instead
+    gPattern(c) {
+      if (!this.rules.gPattern) return null;
+      return (c && c.type === "T" && G_FATIGUE[c.name]) || G_FATIGUE_DEFAULT;
+    }
+    // Which dogs a trail would tire right now (Old Ben keeps the front dog fresh while he's second)
+    gPatternTargets(p, c) {
+      const slots = this.gPattern(c) || [];
+      const [a, b] = p.line;
+      const shield = a && b && a.state !== "exh" && b.state !== "exh" && b.ab === "pOB";
+      return slots.map(s => p.line[s - 1]).filter(d => d && d.state !== "exh" && !(shield && d === a));
+    }
+    async gTirePattern(p, c, max = 9) {
+      const [a, b] = p.line;
+      if (a && b && a.state !== "exh" && b.state !== "exh" && b.ab === "pOB" && (this.gPattern(c) || []).includes(1)) this.log(`${b.name} keeps ${a.name} fresh.`, "good");
+      const targets = this.gPatternTargets(p, c).slice(0, max);
+      for (const d of targets) if (p.line.includes(d)) await this.gTireDog(p, d, c.name || "the trail");
+    }
+    gCanSwap(p) { return !!this.rules.gSwap && (p.hitchN || 0) < this.gHitchLimit(p) && p.line.length >= 2; }
+    gSwap(p, i) {
+      if (!this.gCanSwap(p) || i < 0 || i >= p.line.length - 1) return;
+      const a = p.line[i], b = p.line[i + 1];
+      p.line[i] = b; p.line[i + 1] = a;
+      p.hitchN = (p.hitchN || 0) + 1;
+      this.log(`${p.name} swaps ${a.name} and ${b.name}.`, "act");
+      this.upd();
+    }
     gStepSpends(p) {
+      if (this.rules.gPattern) {
+        const c = this.path[p.pos + 1];
+        const hit = new Set(this.gPatternTargets(p, c && c.type === "T" && !c.up ? null : c));
+        const st = p.line.map(d => hit.has(d) ? (d.state === "rested" ? "tired" : "exh") : d.state);
+        return st.length > 0 && st.every(s => s === "exh");
+      }
       const st = p.line.map(d => d.state);
       const t = s => s === "rested" ? "tired" : "exh";
       const i = st.findIndex(s => s !== "exh");
@@ -1610,8 +1672,9 @@ const LT = (() => {
         const vetB = this.rules.gVetB && p.musher === "Veteran" && !p.after && moved === 1;
         const bootHalf = bootThis && this.rules.gBootiesHalf;
         const bootAll = booties && this.rules.gBootiesAll; // Booties: this Run doesn't tire your dogs
-        if ((!bootThis || bootHalf || (booties && this.rules.gBootiesOne)) && !vetB && !bootAll) await this.gTireLead(p, "breaking trail");
-        if (this.rules.gTire2 && !bootThis && !vetB && !bootAll && !(booties && this.rules.gBootiesOne)) { const d2 = p.line.filter(d => d.state !== "exh" && d !== tiredNow)[0]; if (d2) await this.gTireDog(p, d2, "breaking trail"); }
+        if (this.rules.gPattern) { if ((!bootThis || bootHalf || (booties && this.rules.gBootiesOne)) && !vetB && !bootAll) await this.gTirePattern(p, n.c, bootHalf ? 1 : 9); }
+        else if ((!bootThis || bootHalf || (booties && this.rules.gBootiesOne)) && !vetB && !bootAll) await this.gTireLead(p, "breaking trail");
+        if (!this.rules.gPattern && this.rules.gTire2 && !bootThis && !vetB && !bootAll && !(booties && this.rules.gBootiesOne)) { const d2 = p.line.filter(d => d.state !== "exh" && d !== tiredNow)[0]; if (d2) await this.gTireDog(p, d2, "breaking trail"); }
         this.upd();
         // Pressing on: every step after the first draws an Event right away (not onto a checkpoint).
         const trailEv = (this.rules.gTrailEvOnly || this.rules.gEnterEv) && moved === 1; // optional rule: the first trail of a Run draws an Event too
@@ -1732,6 +1795,7 @@ const LT = (() => {
       for (let guard = 0; guard < 30; guard++) {
         action = p.bot ? Bot.gAction(this, p, noGo) : await this.io.ask(p, { type: "action", noGo });
         if (action.type === "hitch") { this.gHitch(p, action.id, action.end); continue; }
+        if (action.type === "swap") { this.gSwap(p, action.i); continue; }
         if (action.type === "gear") { await this.useFreeGear(p, action.gear, action.target); continue; }
         break;
       }
@@ -1894,18 +1958,23 @@ const LT = (() => {
 
   const Bot = {
     // Gangline: try every order and keep the one with the most Speed over the next 3 trails
+    // Speed over the next 3 trails for an order, tiring dogs the way those trails would
+    gScore(g, p, o) {
+      const tire = s => s === "rested" ? "tired" : "exh";
+      let L = o.map(x => ({ dog: x.dog, st: x.st })), tot = 0;
+      for (let k = 0; k < 3; k++) {
+        tot += g.speedOf(p, L, []).total * (1 - 0.15 * k);
+        const shield = L[1] && L[0].st !== "exh" && L[1].st !== "exh" && L[1].dog.ab === "pOB";
+        const c = g.path[p.pos + 1 + k];
+        const slots = g.rules.gPattern ? g.gPattern(c && c.type === "T" && !c.up ? null : c) : null;
+        if (slots) slots.forEach(s => { const x = L[s - 1]; if (x && x.st !== "exh" && !(shield && s === 1)) x.st = tire(x.st); });
+        else { let n = 0; L.forEach((x, i) => { if (x.st !== "exh" && n < 2) { if (!(shield && i === 0)) x.st = tire(x.st); n++; } }); }
+      }
+      return tot;
+    },
     gBest(g, p, line) {
       if (line.length < 2 || line.length > 6) return Bot.arrange(line);
-      const tire = s => s === "rested" ? "tired" : "exh";
-      const score = o => {
-        let L = o.map(x => ({ dog: x.dog, st: x.st })), tot = 0;
-        for (let k = 0; k < 3; k++) {
-          tot += g.speedOf(p, L, []).total * (1 - 0.15 * k);
-          const shield = L[1] && L[0].st !== "exh" && L[1].st !== "exh" && L[1].dog.ab === "pOB";
-          let n = 0; L.forEach((x, i) => { if (x.st !== "exh" && n < 2) { if (!(shield && i === 0)) x.st = tire(x.st); n++; } });
-        }
-        return tot;
-      };
+      const score = o => Bot.gScore(g, p, o);
       const perms = a => a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r]));
       const habit = Bot.arrange(line);
       let best = habit, bv = score(habit);
@@ -2027,6 +2096,13 @@ const LT = (() => {
       // don't hitch Tank while River Ice is ahead on this leg
       const iceAhead = (() => { for (let i = p.pos + 1; i < g.path.length && g.path[i].type === "T"; i++) if (g.path[i].up && g.path[i].name === "River Ice") return true; return false; })();
       const pool = hand.filter(d => !(d.ab === "heavy" && iceAhead));
+      // Gangline: when not hitching, swap two neighbors if it clearly helps the next few trails
+      if (g.gCanSwap(p) && !(g.gCanHitch(p) && pool.length)) {
+        const cur = p.line.map(d => ({ dog: d, st: d.state }));
+        let bi = -1, bv = Bot.gScore(g, p, cur) + 0.6;
+        for (let i = 0; i < cur.length - 1; i++) { const o = cur.slice(); [o[i], o[i + 1]] = [o[i + 1], o[i]]; const v = Bot.gScore(g, p, o); if (v > bv) { bv = v; bi = i; } }
+        if (bi >= 0) return { type: "swap", i: bi };
+      }
       if (g.gCanHitch(p) && (pool.length || !p.line.length)) {
         const d = (pool.length ? pool : hand).slice().sort((a, b) => dogVal(b) - dogVal(a))[0];
         const f = p.line[0];
@@ -2110,7 +2186,7 @@ const LT = (() => {
       }
     },
   };
-  return { Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, G_EVENTS, G_EVENT_TEXT, G_ALT, G_START, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
+  return { G_FATIGUE, G_FLAT, Game, Bot, CP_TEXT, FINISH_TEXT, DOGS, GEAR, GEAR_INFO, TRAILS, TERRAIN, EVENTS, EVENT_TEXT, G_EVENTS, G_EVENT_TEXT, G_ALT, G_START, MUSHERS, MUSHER_NAMES, HARSH, FINISH_COST };
 })();
 
 
@@ -2311,10 +2387,18 @@ function backCard(kind, o = {}) {
   const url = artFor(artKeys.back(kind));
   return `<div class="card back ${o.cls || ""}">${url ? img(url) : `<span class="bt">LONG<br>TRAIL</span>`}</div>`;
 }
+// Gangline fatigue pattern: 4 dots laid out like a gangline, the lit ones tire when you move onto this trail
+function fdots(c) {
+  const g = S.game;
+  if (!isG() || !g || !g.rules.gPattern || !c || c.type === "F") return "";
+  const slots = g.gPattern(c) || [];
+  return `<span class="fdots" title="Tires gangline slot${slots.length > 1 ? "s" : ""} ${slots.join(", ")}">${[1, 2, 3, 4].map(s => `<i class="${slots.includes(s) ? "on" : ""}" style="--col:${(s - 1) % 2};--row:${s - 1}"></i>`).join("")}</span>`;
+}
+function fNames(p, c) { const g = S.game; const t = g.gPatternTargets(p, c); return t.length ? t.map(d => d.name).join(" and ") : "no dogs"; }
 function trailCard(c, i, o = {}) {
   if (c.type === "CP") {
     const url = isG() ? gArt(artKeys.cp(c.cp)) : artFor(artKeys.cp(c.cp)); // Gangline: always use the Checkpoint card image
-    return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Difficulty 1</div><div class="cx">${esc(isG() ? gCpText() : LT.CP_TEXT)}</div>`}</div>`;
+    return `<div class="card cp" data-zoom="cp|${c.cp}" title="Checkpoint ${c.cp}">${url ? img(url) : `<div class="band"></div><div class="ct">Checkpoint</div><div class="cs">Difficulty 1</div><div class="cx">${esc(isG() ? gCpText() : LT.CP_TEXT)}</div>`}${fdots(c)}</div>`;
   }
   if (c.type === "F") {
     const url = useGArt() ? (finCost() === G_PRINTED.finish ? gArt(artKeys.finish()) : null) : (finCost() === LT.FINISH_COST ? artFor(artKeys.finish()) : null); // the printed card shows its Difficulty
@@ -2323,7 +2407,7 @@ function trailCard(c, i, o = {}) {
   if (!c.up && !o.reveal) return backCard("trail").replace('class="card back', 'data-zoom="back" class="card back');
   const url = gArt(artKeys.trail(c)) || artFor(artKeys.trail(c));
   const inner = url ? img(url) : `<div class="band"></div><span class="tc">${c.cost}</span><div class="ct" style="padding-right:2em">${esc(c.name)}</div><div class="cs">Trail</div><div class="cx">${esc(LT.TERRAIN[c.name])}</div>${c.rtype ? `<span class="rew">${c.rtype === "dog" ? "Dog" : "Gear"} reward</span>` : `<span class="rew" style="opacity:.35">No reward</span>`}`;
-  return `<div class="card trail" data-zoom="${esc(`trail|${c.name}|${c.cost}|${c.rtype || ""}`)}" title="${esc(c.name + " · Difficulty " + c.cost + " · " + (LT.TERRAIN[c.name] || "No terrain rule"))}">${inner}</div>`;
+  return `<div class="card trail" data-zoom="${esc(`trail|${c.name}|${c.cost}|${c.rtype || ""}`)}" title="${esc(c.name + " · Difficulty " + c.cost + " · " + (LT.TERRAIN[c.name] || "No terrain rule"))}">${inner}${fdots(c)}</div>`;
 }
 
 // ---------------- App state ----------------
@@ -2344,6 +2428,7 @@ const S = {
   gFinish: store.get("gGen", 0) >= 2 ? store.get("gFinish", 3) : 3, // Gangline: Finish Difficulty (standard 3)
   gCpDogs: store.get("gGen", 0) >= 3 ? store.get("gCpDogs", 2) : 2, // Gangline: dogs taken at a checkpoint camp or Long Rest (standard 2)
   gGive: store.get("gGen", 0) >= 3 ? store.get("gGive", true) : true, // Gangline: you may give an Event you draw to the leader (standard on)
+  gNew: store.get("gGen", 0) >= 4 ? store.get("gNew", true) : true, // Gangline: trail fatigue patterns, Hitch-or-swap and flattened dogs (standard on)
   legs: store.get("legs", [1, 2, 4]),
   game: null,
   pending: null,      // {p, req, resolve}
@@ -2477,12 +2562,12 @@ function resolvePending(v) {
 
 async function startGame(seed, resume) {
   let opts;
-  if (resume) opts = resume.opts;
+  if (resume) { opts = resume.opts; if (opts.format === "gangline" && opts.rules && opts.rules.gPattern === undefined) opts.rules = { ...opts.rules, gPattern: false, gSwap: false, gFlat: false }; } // saves from before fatigue patterns
   else {
     const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
     store.set("seats", S.seats);
     opts = S.format === "gangline"
-      ? { players: seats, seed, mode: "standard", rules: { lineMax: S.gLineMax, finishCost: S.gFinish, gCpDogs: S.gCpDogs, gGiveAhead: S.gGive, noHarsh: true, noStorm: true }, legs: S.legs.slice(), format: "gangline" }
+      ? { players: seats, seed, mode: "standard", rules: { lineMax: S.gLineMax, finishCost: S.gFinish, gCpDogs: S.gCpDogs, gGiveAhead: S.gGive, gPattern: S.gNew, gSwap: S.gNew, gFlat: S.gNew, noHarsh: true, noStorm: true }, legs: S.legs.slice(), format: "gangline" }
       : { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice(), format: "classic" };
   }
   const io = makeIO();
@@ -2576,7 +2661,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 20, 11:03 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 21, 8:48 AM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2624,8 +2709,8 @@ function renderSetup() {
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
 ` : `
-      <div class="stdline">${S.legs.join("-") === "1-2-4" && S.gLineMax === 4 && S.gFinish === 3 && S.gCpDogs === 2 && S.gGive ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · 4-dog gangline · Finish Difficulty 3 · 2 dogs per checkpoint · Pass Events ahead</span>` : `<span class="chip warn">Custom rules</span><button data-act="gstdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>
-      <p class="small fmtdesc">Your team stays on the table. Each turn: hitch one dog at the front or back, then Run (one trail at a time; your front 2 dogs tire each step and every trail after the first draws an Event; keep going while your Speed covers the next trail) or Camp (every dog recovers one step). Then draw one Event.</p>
+      <div class="stdline">${S.legs.join("-") === "1-2-4" && S.gLineMax === 4 && S.gFinish === 3 && S.gCpDogs === 2 && S.gGive && S.gNew ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · 4-dog gangline · Finish Difficulty 3 · 2 dogs per checkpoint · Pass Events ahead</span>` : `<span class="chip warn">Custom rules</span><button data-act="gstdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>
+      <p class="small fmtdesc">Your team stays on the table. Each turn: hitch one dog at the front or back, or swap two dogs next to each other, then Run (one trail at a time; each trail tires the gangline slots shown on it and draws an Event; keep going while your Speed covers the next trail) or Camp (every dog recovers one step, then draw an Event).</p>
       <div class="label" style="margin-top:14px">Trail layout</div>
       <div class="legs">
         ${["Before Checkpoint 1", "Between the checkpoints", "Final leg"].map((t, i) => `<label><span>${t}</span><select data-leg="${i}">${[1, 2, 3, 4, 5, 6].map(v => `<option ${S.legs[i] == v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}
@@ -2647,6 +2732,7 @@ function renderSetup() {
       </div>
       <p class="small">How many dogs you take when you camp at a checkpoint or take your Long Rest. You always take 1 gear.</p>
       <div class="modes" style="margin-top:10px">
+        <label><input type="checkbox" id="rule-gnew" ${S.gNew ? "checked" : ""}> <span><b>Trail fatigue patterns (standard)</b><small>Each trail shows which gangline slots tire when you move onto it, instead of always the front 2. Hitch can instead swap two dogs next to each other. Dogs are flattened: no dog runs faster than 3 rested, and more of their Speed comes from where they sit.</small></span></label>
         <label><input type="checkbox" id="rule-give" ${S.gGive ? "checked" : ""}> <span><b>Give Events to the leader (standard)</b><small>When you draw an Event and another musher is leading the race on a trail, you may give it to them instead. They resolve it.</small></span></label>
       </div>
       `}
@@ -2888,7 +2974,9 @@ function renderGBoard(p, myTurn) {
   const stName = d => d.state === "rested" ? "rested" : d.state === "tired" ? "tired" : "exhausted";
   const canHitch = myTurn && g.gCanHitch(p);
   el.classList.add("gboard");
-  const lineHTML = p.line.map((d, i) => `<div class="gslot" style="--col:${i % 2};--row:${i}" title="${i === 0 ? "Front · Lead position" : i === p.line.length - 1 ? "Back · Wheel position" : "Position " + (i + 1)}">${dogCard(d, { flag: stName(d) })}<span class="zignum ${i === 0 ? "front" : i === p.line.length - 1 ? "back" : ""}">${i === 0 ? "Front" : i === p.line.length - 1 ? "Back" : i + 1}</span></div>`).join("");
+  const nxC = g.path[p.pos + 1], pat = g.rules.gPattern;
+  const hitSet = pat && myTurn && nxC && nxC.type !== "F" && (nxC.type !== "T" || nxC.up) ? new Set(g.gPatternTargets(p, nxC)) : new Set();
+  const lineHTML = p.line.map((d, i) => `<div class="gslot ${hitSet.has(d) ? "fhit" : ""}" style="--col:${i % 2};--row:${i}" title="${i === 0 ? "Front · Lead position" : i === p.line.length - 1 ? "Back · Wheel position" : "Position " + (i + 1)}${hitSet.has(d) ? " · the next trail tires this dog" : ""}">${dogCard(d, { flag: stName(d) })}${hitSet.has(d) ? `<span class="fhittag">tires</span>` : ""}<span class="zignum ${i === 0 ? "front" : i === p.line.length - 1 ? "back" : ""}">${pat ? `${i + 1}${i === 0 ? " · Front" : i === p.line.length - 1 && i > 0 ? " · Back" : ""}` : i === 0 ? "Front" : i === p.line.length - 1 ? "Back" : i + 1}</span></div>`).join("");
   const gn = Math.max(1, isFit() ? (g.rules.lineMax || 4) : p.line.length);
   const tz = [];
   if (p.used.length) tz.push(`<div class="tz"><div class="label">Used gear · back at your Long Rest</div><div class="row">${p.used.map(gr => gearCard(gr, { used: true })).join("")}</div></div>`);
@@ -2935,12 +3023,15 @@ function gActionsHTML(p, st) {
   h += `<div class="gspeed"><div><span class="small">Team Speed</span> <b class="big">${sp.total}</b></div>`;
   if (n && n.cost != null) h += `<div><span class="small">${esc(g.label(n.nxt))}</span> <b class="big">${n.cost}</b></div>`;
   h += `</div><div class="small">${sp.parts.map(([w, v]) => `${esc(w)} ${v >= 0 ? "+" : ""}${v}`).join(" · ") || "No dogs hitched."}</div>`;
+  const canSwap = g.gCanSwap(p);
   if (g.gCanHitch(p)) {
     const lim = g.gHitchLimit(p), left = lim - (p.hitchN || 0);
-    h += `<div class="label" style="margin-top:10px">1 · Hitch ${lim > 1 ? `up to ${left} more dog${left > 1 ? "s" : ""}` : "a dog"} (optional)</div>`;
+    h += `<div class="label" style="margin-top:10px">1 · Hitch ${lim > 1 ? `up to ${left} more dog${left > 1 ? "s" : ""}` : "a dog"}${canSwap ? " or swap two dogs" : ""} (optional)</div>`;
     h += st.sel ? `<div class="row2"><button data-act="ghitch" data-v="front">At the front</button><button data-act="ghitch" data-v="back">At the back</button><button class="ghost" data-act="gsel" data-id="${st.sel}">Cancel</button></div>`
       : `<div class="small">Tap a dog in your hand, then choose front or back.</div>`;
-  } else h += `<div class="small" style="margin-top:8px">${p.hitchN ? "You've hitched this turn." : hand.length ? "Your line is full." : "No dogs in hand to hitch."}</div>`;
+  } else if (canSwap) h += `<div class="label" style="margin-top:10px">1 · Swap two dogs (optional)</div><div class="small">${hand.length ? "Your line is full, but you" : "You"} can swap two dogs next to each other.</div>`;
+  else h += `<div class="small" style="margin-top:8px">${p.hitchN ? "You've used your Hitch this turn." : hand.length ? "Your line is full." : "No dogs in hand to hitch."}</div>`;
+  if (canSwap && !st.sel) h += `<div class="swaps">${p.line.slice(0, -1).map((d, i) => `<button data-act="gswap" data-v="${i}" title="Swap slots ${i + 1} and ${i + 2}">${esc(d.name)} ⇄ ${esc(p.line[i + 1].name)}</button>`).join("")}</div>`;
   h += `<div class="label" style="margin-top:10px">2 · Run or Camp</div><div class="acts">`;
   const noLine = !p.line.length && hand.length;
   if (L.atOpenCP) {
@@ -2952,7 +3043,8 @@ function gActionsHTML(p, st) {
   else if (!n) goSub = L.canPass ? "Nowhere to go." : "Take your Long Rest first.";
   else if (n.blocked) goSub = "Tank won't go on River Ice, and he's your only hitched dog.";
   else if (!n.ok) goSub = `Need ${n.cost} Speed for ${g.label(n.nxt)}. You have ${n.speed}.`;
-  else goSub = `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire, then you draw an Event (not at a checkpoint).`;
+  else goSub = g.rules.gPattern ? `Move onto ${g.label(n.nxt)}: it tires ${fNames(p, n.c)}, then you draw an Event (not at a checkpoint). Each trail you press on to tires the slots shown on it.`
+    : `Move onto ${g.label(n.nxt)}. Each step, your first 2 dogs that aren't exhausted tire, then you draw an Event (not at a checkpoint).`;
   h += btn("ggo", "Run", goSub + (gearSel.length ? ` With ${gearSel.map(x => x.name).join(", ")}.` : ""), { primary: !!(n && n.ok && !noGo && !L.mustLongRest), disabled: !(n && n.ok) || noGo || L.mustLongRest });
   const mustHitch = !p.line.length && hand.length;
   if (mustHitch) h += `<div class="small" style="color:var(--bad);margin:6px 0">Hitch a dog first. If your gangline is empty at the end of your turn, you're scratched.</div>`;
@@ -3211,7 +3303,8 @@ function runInfo(p, r) {
   else if (r.type === "gSnack") { sp = r.speed - 2; cost = r.cost; label = r.label; extra = ` <span class="ok">(${r.speed} with a Snack)</span>`; }
   else { const n = g.gNext(p, p._gRunGear || []); if (!n) return ""; sp = n.speed; cost = n.cost; label = g.label(n.nxt); }
   const verdict = cost == null ? `<span class="muted">face-down</span>` : sp >= cost ? `<span class="ok">Speed covers it</span>` : `<span class="no">Not enough Speed</span>`;
-  return `<div class="runinfo"><span>${esc(p.name)}'s Speed <b>${sp}</b>${extra}</span><span>Next: ${esc(label)} · Difficulty <b>${cost == null ? "?" : cost}</b></span>${verdict}</div>`;
+  const nc = g.path[p.pos + 1], tires = g.rules.gPattern && nc && nc.type !== "F" && (nc.type !== "T" || nc.up) ? `<span>Tires: ${esc(fNames(p, nc))}</span>` : "";
+  return `<div class="runinfo"><span>${esc(p.name)}'s Speed <b>${sp}</b>${extra}</span><span>Next: ${esc(label)} · Difficulty <b>${cost == null ? "?" : cost}</b></span>${verdict}${tires}</div>`;
 }
 function modal(html) {
   const pd = S.pending, dock = !S.overlay && pd && !pd.p.bot && isG() && DOCK.has(pd.req.type);
@@ -3283,14 +3376,14 @@ function renderModal() {
     case "gContinue":
       return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Keep going?</h3>
         <p>Your team's Speed is now <b>${r.speed}</b>. ${esc(r.label)} has Difficulty <b>${r.cost}</b>.</p>
-        <p class="small">If you keep going, your first 2 dogs that aren't exhausted tire${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
+        <p class="small">If you keep going, ${g.rules.gPattern ? `${esc(g.label(r.next))} tires ${esc(fNames(p, g.path[r.next]))}` : "your first 2 dogs that aren't exhausted tire"}${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
         ${g.gStepSpends(p) && g.path[r.next] && g.path[r.next].type === "T" ? `<p class="small" style="color:var(--bad)"><b>Danger:</b> this step exhausts your whole team. End your turn on a trail like that and you're scratched.</p>` : ""}
         <div class="btns"><button data-act="pick" data-v="0">Stop here</button>${r.canBoot ? `<button data-act="pick" data-v="2">Keep going with Booties (no tiring)</button>` : ""}<button class="primary" data-act="pick" data-v="1">Keep going</button></div>`);
     case "gSnack": {
       const sc = p.gear.find(x => x.name === "Snack");
       return modal(`<div class="label">${esc(p.name)} · Run</div><h3>Eat a Snack to keep going?</h3><div class="cards">${sc ? gearCard(sc) : ""}</div>
         <p>Your team's Speed is <b>${r.speed - 2}</b>, and ${esc(r.label)} has Difficulty <b>${r.cost}</b>. A Snack gives +2 Speed for that trail.</p>
-        <p class="small">If you keep going, your first 2 dogs that aren't exhausted tire${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
+        <p class="small">If you keep going, ${g.rules.gPattern ? `${esc(g.label(r.next))} tires ${esc(fNames(p, g.path[r.next]))}` : "your first 2 dogs that aren't exhausted tire"}${g.path[r.next] && g.path[r.next].type === "T" ? ", then you draw an Event" : ""}.</p>
         <div class="btns"><button data-act="pick" data-v="0">Stop here</button><button class="primary" data-act="pick" data-v="1">Use Snack and keep going</button></div>`);
     }
     case "alpineIgnore":
@@ -3390,8 +3483,8 @@ function rulesHTML() {
   <details class="rules" open><summary>Your turn</summary><ul>
     <li><b>Start:</b> your line is empty and your 3 starting dogs are in your hand. Trail 1 is always the Starting Chute, Difficulty 2. The Finish is Difficulty ${finCost()}.</li>
     <li>Your team stays on the table as your gangline, front to back, at most ${(g ? g.rules.lineMax : S.gLineMax) || 4} dogs. Dogs not in the line are in your hand.</li>
-    <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line. If your line is empty, you must hitch.</li>
-    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted), then you <b>draw an Event</b> for that trail. Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. If an Event moves you back, your Run ends. Take the reward where you stop.</li>
+    <li><b>1. Hitch:</b> you may add one dog from your hand at the front or the back of your line${g && g.rules.gSwap ? ", <b>or</b> swap the places of two dogs next to each other in your line" : ""}. If your line is empty, you must hitch.</li>
+    <li><b>2. Run:</b> if your team's Speed is at least the next trail's Difficulty, move onto it. ${g && g.rules.gPattern ? "Each trail shows 4 dots laid out like a gangline (slot 1 is the front). The dogs in the lit slots each tire one step (rested → tired → exhausted); an empty slot or an exhausted dog is skipped. Snowfield 1 &amp; 2 · Spruce Forest 2 &amp; 3 · Mountain Pass 3 &amp; 4 · River Ice 1 &amp; 4 · Exposed Ridge 1 &amp; 3 · Deep Powder 1, 2 &amp; 3 · Starting Chute and checkpoints 1 &amp; 2. Then you" : "Each step, your first 2 dogs that aren't exhausted each tire one step (rested → tired → exhausted), then you"} <b>draw an Event</b> for that trail. Exhausted dogs stay in line but give nothing. Moving flips the next trail. Keep going while your weaker team still covers the next trail, or stop. If an Event moves you back, your Run ends. Take the reward where you stop.</li>
     <li><b>2. or Camp:</b> every dog in your line recovers one step (exhausted → tired → rested), then <b>draw an Event</b>. You may send dogs back to your hand and rearrange your line. At least one dog must stay hitched.</li>
     <li><b>Events:</b> one for each trail you move onto, and one when you camp in the open. Never at a checkpoint: moving onto or camping at a checkpoint is free. No Events before Checkpoint 1.${((g ? g.rules.gGiveAhead : S.gGive)) ? " <b>Give it to the leader:</b> when you draw an Event and another musher is leading the race on a trail, you may give it to them instead. They resolve it." : ""}</li>
     <li><b>Drafting:</b> a trail another musher is on or has passed is 1 less Difficulty for you (Deep Powder: 3 less). The leader breaks trail and takes the weather; everyone behind follows their tracks.</li>
@@ -3611,7 +3704,8 @@ document.addEventListener("change", async e => {
   if (t.id === "rule-line") { S.rules.lineMax = +t.value || 0; if (!S.rules.lineMax) delete S.rules.lineMax; store.set("rules", S.rules); }
   if (t.id === "rule-storm") { if (t.checked) delete S.rules.noStorm; else S.rules.noStorm = true; store.set("rules", S.rules); }
   if (t.id === "rule-harsh") { if (t.checked) delete S.rules.noHarsh; else S.rules.noHarsh = true; store.set("rules", S.rules); }
-  if (t.id === "rule-give") { S.gGive = t.checked; store.set("gGive", S.gGive); store.set("gGen", 3); if (S.screen === "setup") { renderSetup(); return; } }
+  if (t.id === "rule-gnew") { S.gNew = t.checked; store.set("gNew", S.gNew); store.set("gGen", 4); if (S.screen === "setup") { renderSetup(); return; } }
+  if (t.id === "rule-give") { S.gGive = t.checked; store.set("gGive", S.gGive); store.set("gGen", 4); if (S.screen === "setup") { renderSetup(); return; } }
   if (t.id === "rule-vet") { if (t.checked) S.rules.vetCheck = true; else delete S.rules.vetCheck; store.set("rules", S.rules); }
   if (t.id === "rule-big") { if (t.checked) S.rules.bigLine = 5; else delete S.rules.bigLine; store.set("rules", S.rules); }
   if (S.screen === "setup" && (t.name === "mode" || /^rule-/.test(t.id || ""))) { renderSetup(); return; }
@@ -3649,10 +3743,10 @@ document.addEventListener("click", e => {
     case "discardsave": clearSave(); renderSetup(); break;
     case "legreset": case "stdreset": resetToStandard(); renderSetup(); break;
     case "fmttab": S.format = b.dataset.v === "gangline" ? "gangline" : "classic"; store.set("format", S.format); renderSetup(); break;
-    case "glinemax": S.gLineMax = +b.dataset.v; store.set("gLineMax", S.gLineMax); store.set("gGen", 3); renderSetup(); break;
-    case "gstdreset": S.legs = [1, 2, 4]; S.gLineMax = 4; S.gFinish = 3; S.gCpDogs = 2; S.gGive = true; store.set("legs", S.legs); store.set("gLineMax", 4); store.set("gFinish", 3); store.set("gCpDogs", 2); store.set("gGive", true); renderSetup(); break;
-    case "gcpdogs": S.gCpDogs = +b.dataset.v; store.set("gCpDogs", S.gCpDogs); store.set("gGen", 3); renderSetup(); break;
-    case "gfinish": S.gFinish = +b.dataset.v; store.set("gFinish", S.gFinish); store.set("gGen", 3); renderSetup(); break;
+    case "glinemax": S.gLineMax = +b.dataset.v; store.set("gLineMax", S.gLineMax); store.set("gGen", 4); renderSetup(); break;
+    case "gstdreset": S.legs = [1, 2, 4]; S.gLineMax = 4; S.gFinish = 3; S.gCpDogs = 2; S.gGive = true; S.gNew = true; store.set("gNew", true); store.set("legs", S.legs); store.set("gLineMax", 4); store.set("gFinish", 3); store.set("gCpDogs", 2); store.set("gGive", true); renderSetup(); break;
+    case "gcpdogs": S.gCpDogs = +b.dataset.v; store.set("gCpDogs", S.gCpDogs); store.set("gGen", 4); renderSetup(); break;
+    case "gfinish": S.gFinish = +b.dataset.v; store.set("gFinish", S.gFinish); store.set("gGen", 4); renderSetup(); break;
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
     // game header
@@ -3700,6 +3794,7 @@ document.addEventListener("click", e => {
     case "sheet": { document.documentElement.classList.toggle("sheet"); document.documentElement.classList.remove("logsheet"); buildMobileBar(); break; }
     case "logsheet": { const on = document.documentElement.classList.toggle("logsheet"); document.documentElement.classList.remove("sheet"); const lw = $("#logwrap"); if (on && lw) lw.open = true; buildMobileBar(); break; }
     case "gsel": { const st = gState(); st.sel = st.sel === id ? null : id; renderGame(); break; }
+    case "gswap": if (pd) { S.g = null; resolvePending({ type: "swap", i: +b.dataset.v }); } break;
     case "ghitch": if (pd) { const st = gState(); const sel = st.sel; st.sel = null; if (sel) resolvePending({ type: "hitch", id: sel, end: b.dataset.v }); } break;
     case "ggear": { const st = gState(); if (st.gear.has(id)) st.gear.delete(id); else st.gear.add(id); renderGame(); break; }
     case "gmove": { const st = gState(); const p = pd && pd.p; if (!p) break; const ord = gOrder(p, st).map(d => d.id); const i = ord.indexOf(id), j = i + (+b.dataset.v); if (i >= 0 && j >= 0 && j < ord.length) { [ord[i], ord[j]] = [ord[j], ord[i]]; st.order = ord; } renderGame(); break; }
@@ -3768,7 +3863,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 20, 11:03 AM";
+const LT_BUILD = "Oct 21, 8:48 AM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
