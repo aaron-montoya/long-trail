@@ -752,7 +752,8 @@ const LT = (() => {
         if (this.rules.gPattern === undefined) this.rules.gPattern = true; // Gangline standard: each trail tires the gangline slots shown on it
         if (this.rules.gSwap === undefined) this.rules.gSwap = true; // Gangline standard: Hitch, or swap two dogs next to each other
         if (this.rules.gFlat === undefined) this.rules.gFlat = true;
-        if (this.rules.gCampReturn === undefined) this.rules.gCampReturn = true; // Gangline standard: camping in the open rests only the dogs you send back to your hand // Gangline standard: flattened dogs (rested Speed 3 at most)
+        if (this.rules.gCampReturn === undefined) this.rules.gCampReturn = true;
+        if (this.rules.gCpGear === undefined) this.rules.gCpGear = true; // Gangline standard: a checkpoint camp also returns your used gear // Gangline standard: camping in the open rests only the dogs you send back to your hand // Gangline standard: flattened dogs (rested Speed 3 at most)
         // a spent team on a trail is scratched (checkpoints are safe)
         if (this.rules.gScratchExh === undefined) { this.rules.gScratchExh = "line"; this.rules.gScratchNoCP = true; }
         if (this.rules.gTankAuto === undefined) this.rules.gTankAuto = true; // Tank steps off the line before River Ice
@@ -1479,10 +1480,9 @@ const LT = (() => {
       const trapExtra = p.musher === "Trapper" && !p.after ? (this.rules.gTrapExtra != null ? this.rules.gTrapExtra : 3) : 0;
       const [dd, dk, gd] = this.cpGains(cp, long);
       const src = long ? "Long Rest" : "Checkpoint camp";
-      if (long) {
-        p.gear.push(...p.used); p.used = [];
-        this.log(`${p.name} takes the Long Rest at Checkpoint ${cp}.`, "act");
-      } else this.log(`${p.name} camps at Checkpoint ${cp}.`, "act");
+      if (long || (this.format === "gangline" && this.rules.gCpGear)) { p.gear.push(...p.used); p.used = []; }
+      if (long) this.log(`${p.name} takes the Long Rest at Checkpoint ${cp}.`, "act");
+      else this.log(`${p.name} camps at Checkpoint ${cp}${this.format === "gangline" && this.rules.gCpGear ? " and gets their used gear back" : ""}.`, "act");
       await this.drawDogs(p, dd + trapExtra, dk, src);
       if (gd > 1) await this.drawGearKeep(p, gd, src);
       else this.takeGear(p, src);
@@ -2411,7 +2411,7 @@ const finCost = () => S.game ? (S.game.rules.finishCost || LT.FINISH_COST) : (is
 const gAlt = (kind, name) => isG() ? LT.G_ALT[kind][name] : null;
 const cpDogsN = () => S.game ? (S.game.rules.gCpDogs || 1) : S.gCpDogs;
 const cpDogsTxt = () => cpDogsN() > 1 ? `the top ${cpDogsN()} dogs` : "the top dog";
-const gCpText = () => `Camp here once: every dog rests, take ${cpDogsTxt()} and the top gear. Long Rest: the same, plus all used gear returns, then skip a turn. Checkpoints never make you draw an Event.`;
+const gCpText = () => (S.game ? S.game.rules.gCpGear : S.gCpGear) ? `Camp here once: every dog rests, all used gear returns, take ${cpDogsTxt()} and the top gear. Long Rest: the same, then skip a turn. Checkpoints never make you draw an Event.` : `Camp here once: every dog rests, take ${cpDogsTxt()} and the top gear. Long Rest: the same, plus all used gear returns, then skip a turn. Checkpoints never make you draw an Event.`;
 const musherT = m => gAlt("musher", m) || LT.MUSHERS[m];
 const evText = e => (isG() ? LT.G_EVENT_TEXT[e] : LT.EVENT_TEXT[e]) || "";
 function eventCard(e, o = {}) {
@@ -2475,6 +2475,7 @@ const S = {
   gFinish: store.get("gGen", 0) >= 2 ? store.get("gFinish", 3) : 3, // Gangline: Finish Difficulty (standard 3)
   gCpDogs: store.get("gGen", 0) >= 3 ? store.get("gCpDogs", 2) : 2, // Gangline: dogs taken at a checkpoint camp or Long Rest (standard 2)
   gGive: store.get("gGen", 0) >= 3 ? store.get("gGive", true) : true, // Gangline: you may give an Event you draw to the leader (standard on)
+  gCpGear: store.get("gGen", 0) >= 6 ? store.get("gCpGear", true) : true, // Gangline: a checkpoint camp returns used gear (standard on)
   gCampR: store.get("gGen", 0) >= 5 ? store.get("gCampR", true) : true, // Gangline: camping in the open rests only the dogs you send to your hand (standard on)
   gNew: store.get("gGen", 0) >= 4 ? store.get("gNew", true) : true, // Gangline: trail fatigue patterns, Hitch-or-swap and flattened dogs (standard on)
   legs: store.get("legs", [1, 2, 4]),
@@ -2610,12 +2611,12 @@ function resolvePending(v) {
 
 async function startGame(seed, resume) {
   let opts;
-  if (resume) { opts = resume.opts; if (opts.format === "gangline" && opts.rules && opts.rules.gPattern === undefined) opts.rules = { ...opts.rules, gPattern: false, gSwap: false, gFlat: false }; if (opts.format === "gangline" && opts.rules && opts.rules.gCampReturn === undefined) opts.rules = { ...opts.rules, gCampReturn: false }; } // saves from before fatigue patterns
+  if (resume) { opts = resume.opts; if (opts.format === "gangline" && opts.rules && opts.rules.gPattern === undefined) opts.rules = { ...opts.rules, gPattern: false, gSwap: false, gFlat: false }; if (opts.format === "gangline" && opts.rules && opts.rules.gCampReturn === undefined) opts.rules = { ...opts.rules, gCampReturn: false }; if (opts.format === "gangline" && opts.rules && opts.rules.gCpGear === undefined) opts.rules = { ...opts.rules, gCpGear: false }; } // saves from before fatigue patterns
   else {
     const seats = S.seats.map((s, i) => ({ name: s.name.trim() || (s.bot ? `Bot ${i + 1}` : `Player ${i + 1}`), bot: s.bot, musher: s.musher, color: COLORS[i], kept: s.kept || null }));
     store.set("seats", S.seats);
     opts = S.format === "gangline"
-      ? { players: seats, seed, mode: "standard", rules: { lineMax: S.gLineMax, finishCost: S.gFinish, gCpDogs: S.gCpDogs, gGiveAhead: S.gGive, gPattern: S.gNew, gSwap: S.gNew, gFlat: S.gNew, gCampReturn: S.gCampR, noHarsh: true, noStorm: true }, legs: S.legs.slice(), format: "gangline" }
+      ? { players: seats, seed, mode: "standard", rules: { lineMax: S.gLineMax, finishCost: S.gFinish, gCpDogs: S.gCpDogs, gGiveAhead: S.gGive, gPattern: S.gNew, gSwap: S.gNew, gFlat: S.gNew, gCampReturn: S.gCampR, gCpGear: S.gCpGear, noHarsh: true, noStorm: true }, legs: S.legs.slice(), format: "gangline" }
       : { players: seats, seed, mode: S.mode, rules: { ...S.rules }, legs: S.legs.slice(), format: "classic" };
   }
   const io = makeIO();
@@ -2709,7 +2710,7 @@ function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div class="hero">
-      <div class="label">Playtest table · v9 rules · build Oct 21, 1:46 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
+      <div class="label">Playtest table · v9 rules · build Oct 30, 2:47 PM ${onWeb ? `<button class="ghost" data-act="checkupd" style="padding:1px 8px;font-size:11.5px;margin-left:6px">Check for updates</button>` : ""}</div>
       <h1>Long <span style="color:var(--accent)">Trail</span></h1>
       <p>A sled-dog race for 2 to 4 mushers. Pick who sits at each seat. Humans share this screen and pass it around; bots play themselves.</p>
     </div>
@@ -2757,7 +2758,7 @@ function renderSetup() {
         <label><input type="checkbox" id="rule-big" ${S.rules.bigLine ? "checked" : ""}> <span><b>Heavy sled</b><small>On the final leg, running 5 or more dogs draws an Event.</small></span></label>
       </div>
 ` : `
-      <div class="stdline">${S.legs.join("-") === "1-2-4" && S.gLineMax === 4 && S.gFinish === 3 && S.gCpDogs === 2 && S.gGive && S.gNew && S.gCampR ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · 4-dog gangline · Finish Difficulty 3 · 2 dogs per checkpoint · Pass Events ahead</span>` : `<span class="chip warn">Custom rules</span><button data-act="gstdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>
+      <div class="stdline">${S.legs.join("-") === "1-2-4" && S.gLineMax === 4 && S.gFinish === 3 && S.gCpDogs === 2 && S.gGive && S.gNew && S.gCampR && S.gCpGear ? `<span class="chip ok">Standard rules</span><span class="small">1-2-4 trails · 4-dog gangline · Finish Difficulty 3 · 2 dogs per checkpoint · Pass Events ahead</span>` : `<span class="chip warn">Custom rules</span><button data-act="gstdreset" style="padding:3px 10px;font-size:13px">Reset to standard</button>`}</div>
       <p class="small fmtdesc">Your team stays on the table. Each turn: hitch one dog at the front or back, or swap two dogs next to each other, then Run (one trail at a time; each trail tires the gangline slots shown on it and draws an Event; keep going while your Speed covers the next trail) or Camp (send any dogs to your hand to rest them, rearrange the rest, then draw an Event).</p>
       <div class="label" style="margin-top:14px">Trail layout</div>
       <div class="legs">
@@ -2782,6 +2783,7 @@ function renderSetup() {
       <div class="modes" style="margin-top:10px">
         <label><input type="checkbox" id="rule-gnew" ${S.gNew ? "checked" : ""}> <span><b>Trail fatigue patterns (standard)</b><small>Each trail shows which gangline slots tire when you move onto it, instead of always the front 2. Hitch can instead swap two dogs next to each other. Dogs are flattened: no dog runs faster than 3 rested, and more of their Speed comes from where they sit.</small></span></label>
         <label><input type="checkbox" id="rule-gcamp" ${S.gCampR ? "checked" : ""}> <span><b>Camp by sending dogs to your hand (standard)</b><small>When you camp in the open, send any dogs from your gangline to your hand: they become rested. Dogs left hitched stay as they are. Off: every dog in your gangline recovers one step instead.</small></span></label>
+        <label><input type="checkbox" id="rule-gcpgear" ${S.gCpGear ? "checked" : ""}> <span><b>Checkpoint camps return used gear (standard)</b><small>Camping at a checkpoint also brings all your used gear back to your hand, not just the Long Rest. Off: only the Long Rest returns used gear.</small></span></label>
         <label><input type="checkbox" id="rule-give" ${S.gGive ? "checked" : ""}> <span><b>Give Events to the leader (standard)</b><small>When you draw an Event and another musher is leading the race on a trail, you may give it to them instead. They resolve it.</small></span></label>
       </div>
       `}
@@ -3114,7 +3116,7 @@ function gActionsHTML(p, st) {
   h += `<div class="label" style="margin-top:10px">2 · Run or Camp</div><div class="acts">`;
   const noLine = !p.line.length && hand.length;
   if (L.atOpenCP) {
-    h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, `Every dog rests. Take ${cpDogsTxt()} and the top gear. No Event.`, { disabled: L.mustLongRest || noLine });
+    h += btn("cpcamp", `Camp at Checkpoint ${L.cp}`, `Every dog rests${g.rules.gCpGear ? " and used gear returns" : ""}. Take ${cpDogsTxt()} and the top gear. No Event.`, { disabled: L.mustLongRest || noLine });
     h += btn("longrest", "Long Rest", `Every dog rests, used gear returns, take ${cpDogsTxt()} and the top gear, then skip a turn. No Event.`, { primary: L.mustLongRest, disabled: noLine });
   }
   let goSub;
@@ -3582,7 +3584,7 @@ function rulesHTML() {
     <li>Rested dogs give their Speed and ability. Tired dogs give their tired Speed, role bonus and any ability printed on their tired half. Exhausted dogs give nothing, not even a Lead or Wheel bonus.</li>
     <li>Lead bonus +1 if a Lead dog is at the front, Wheel bonus +1 if a Wheel dog is at the back, with at least 2 dogs that aren't exhausted. Drafting: a trail's Difficulty is 1 less if another musher is on or past it.</li></ul></details>
   <details class="rules"><summary>Checkpoints</summary><ul>
-    <li>Camp once per checkpoint: every dog rests, take ${cpDogsTxt()} and the top gear. No Event.</li>
+    <li>Camp once per checkpoint: every dog rests${g && g.rules.gCpGear ? ", all used gear returns to your hand" : ""}, take ${cpDogsTxt()} and the top gear. No Event.</li>
     <li>Long Rest once per race (required before passing Checkpoint 2): every dog rests, used gear returns, take ${cpDogsTxt()} and the top gear, skip your next turn, then flip your musher. No Event.</li></ul></details>
   <div class="btns" style="margin-top:12px"><button class="primary" data-act="closeov">Close</button></div>`;
   const mode = g ? g.mode : S.mode, rules = g ? g.rules : S.rules, legs = g ? g.legs : S.legs;
@@ -3800,9 +3802,10 @@ document.addEventListener("change", async e => {
   if (t.id === "rule-line") { S.rules.lineMax = +t.value || 0; if (!S.rules.lineMax) delete S.rules.lineMax; store.set("rules", S.rules); }
   if (t.id === "rule-storm") { if (t.checked) delete S.rules.noStorm; else S.rules.noStorm = true; store.set("rules", S.rules); }
   if (t.id === "rule-harsh") { if (t.checked) delete S.rules.noHarsh; else S.rules.noHarsh = true; store.set("rules", S.rules); }
-  if (t.id === "rule-gcamp") { S.gCampR = t.checked; store.set("gCampR", S.gCampR); store.set("gGen", 5); if (S.screen === "setup") { renderSetup(); return; } }
-  if (t.id === "rule-gnew") { S.gNew = t.checked; store.set("gNew", S.gNew); store.set("gGen", 5); if (S.screen === "setup") { renderSetup(); return; } }
-  if (t.id === "rule-give") { S.gGive = t.checked; store.set("gGive", S.gGive); store.set("gGen", 5); if (S.screen === "setup") { renderSetup(); return; } }
+  if (t.id === "rule-gcpgear") { S.gCpGear = t.checked; store.set("gCpGear", S.gCpGear); store.set("gGen", 6); if (S.screen === "setup") { renderSetup(); return; } }
+  if (t.id === "rule-gcamp") { S.gCampR = t.checked; store.set("gCampR", S.gCampR); store.set("gGen", 6); if (S.screen === "setup") { renderSetup(); return; } }
+  if (t.id === "rule-gnew") { S.gNew = t.checked; store.set("gNew", S.gNew); store.set("gGen", 6); if (S.screen === "setup") { renderSetup(); return; } }
+  if (t.id === "rule-give") { S.gGive = t.checked; store.set("gGive", S.gGive); store.set("gGen", 6); if (S.screen === "setup") { renderSetup(); return; } }
   if (t.id === "rule-vet") { if (t.checked) S.rules.vetCheck = true; else delete S.rules.vetCheck; store.set("rules", S.rules); }
   if (t.id === "rule-big") { if (t.checked) S.rules.bigLine = 5; else delete S.rules.bigLine; store.set("rules", S.rules); }
   if (S.screen === "setup" && (t.name === "mode" || /^rule-/.test(t.id || ""))) { renderSetup(); return; }
@@ -3840,10 +3843,10 @@ document.addEventListener("click", e => {
     case "discardsave": clearSave(); renderSetup(); break;
     case "legreset": case "stdreset": resetToStandard(); renderSetup(); break;
     case "fmttab": S.format = b.dataset.v === "gangline" ? "gangline" : "classic"; store.set("format", S.format); renderSetup(); break;
-    case "glinemax": S.gLineMax = +b.dataset.v; store.set("gLineMax", S.gLineMax); store.set("gGen", 5); renderSetup(); break;
-    case "gstdreset": S.legs = [1, 2, 4]; S.gLineMax = 4; S.gFinish = 3; S.gCpDogs = 2; S.gGive = true; S.gNew = true; store.set("gNew", true); S.gCampR = true; store.set("gCampR", true); store.set("legs", S.legs); store.set("gLineMax", 4); store.set("gFinish", 3); store.set("gCpDogs", 2); store.set("gGive", true); renderSetup(); break;
-    case "gcpdogs": S.gCpDogs = +b.dataset.v; store.set("gCpDogs", S.gCpDogs); store.set("gGen", 5); renderSetup(); break;
-    case "gfinish": S.gFinish = +b.dataset.v; store.set("gFinish", S.gFinish); store.set("gGen", 5); renderSetup(); break;
+    case "glinemax": S.gLineMax = +b.dataset.v; store.set("gLineMax", S.gLineMax); store.set("gGen", 6); renderSetup(); break;
+    case "gstdreset": S.legs = [1, 2, 4]; S.gLineMax = 4; S.gFinish = 3; S.gCpDogs = 2; S.gGive = true; S.gNew = true; store.set("gNew", true); S.gCampR = true; store.set("gCampR", true); S.gCpGear = true; store.set("gCpGear", true); store.set("legs", S.legs); store.set("gLineMax", 4); store.set("gFinish", 3); store.set("gCpDogs", 2); store.set("gGive", true); renderSetup(); break;
+    case "gcpdogs": S.gCpDogs = +b.dataset.v; store.set("gCpDogs", S.gCpDogs); store.set("gGen", 6); renderSetup(); break;
+    case "gfinish": S.gFinish = +b.dataset.v; store.set("gFinish", S.gFinish); store.set("gGen", 6); renderSetup(); break;
     case "clearart": IDB.clear(); setArt([], ""); loadManifest().then(renderSetup); renderSetup(); break;
     case "artcheck": S.overlay = { type: "artcheck", html: artCheckHTML() }; if (S.screen === "setup") { app.insertAdjacentHTML("beforeend", `<div id="modal"></div>`); } renderModal(); break;
     // game header
@@ -3961,7 +3964,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------------- Updates (for the GitHub Pages copy) ----------------
-const LT_BUILD = "Oct 21, 1:46 PM";
+const LT_BUILD = "Oct 30, 2:47 PM";
 const onWeb = /github\.io$/i.test(location.hostname);
 function reloadLatest() { location.replace(location.pathname + "?v=" + Date.now()); }
 async function checkForUpdate(manual) {
